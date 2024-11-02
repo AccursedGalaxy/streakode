@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"log"
 	"os"
 	"path/filepath"
@@ -27,19 +28,76 @@ type Config struct {
 	} `mapstructure:"goal_settings"`
 }
 
-var AppConfig Config
+type State struct {
+	ActiveProfile string `json:"active_profile"`
+}
+
+var (
+	AppConfig Config
+	AppState  State
+)
+
+func SaveState() error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	
+	stateFile := filepath.Join(home, ".streakode.state")
+	data, err := json.Marshal(AppState)
+	if err != nil {
+		return err
+	}
+	
+	return os.WriteFile(stateFile, data, 0644)
+}
+
+func LoadState() error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	
+	stateFile := filepath.Join(home, ".streakode.state")
+	data, err := os.ReadFile(stateFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			AppState = State{} // Initialize empty state
+			return nil
+		}
+		return err
+	}
+	
+	return json.Unmarshal(data, &AppState)
+}
 
 // LoadConfig initializes the config with optional profile selection
 func LoadConfig(profile string) {
+	// Load the state first
+	if err := LoadState(); err != nil {
+		log.Printf("Warning: Could not load state: %v", err)
+	}
+
+	// If no profile is provided, use the one from state
+	if profile == "" {
+		profile = AppState.ActiveProfile
+	} else {
+		// Update state with new profile
+		AppState.ActiveProfile = profile
+		if err := SaveState(); err != nil {
+			log.Printf("Warning: Could not save state: %v", err)
+		}
+	}
+
+	// Always start with default config name
 	viper.SetConfigName(".streakodeconfig")
 	viper.AddConfigPath("$HOME")
 	viper.SetConfigType("yaml")
 	viper.SetEnvPrefix("streakode")
-	// override config with env vars if set
 	viper.AutomaticEnv()
 
-	// Set Profile if provided
-	if profile != "" {
+	// Only append profile suffix if it's not empty and not "default"
+	if profile != "" && profile != "default" && profile != "-" {
 		viper.SetConfigName(".streakodeconfig_" + profile)
 	}
 
