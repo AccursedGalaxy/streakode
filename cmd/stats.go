@@ -30,79 +30,98 @@ func DisplayStats() {
 		}
 	}
 
-	// Create a more dynamic and compact summary
-	fmt.Printf("\n🚀 %s's Coding Activity in the Last %d days\n", config.AppConfig.Author, config.AppConfig.DormantThreshold)
+	// Always show header, as it provides context
+	fmt.Printf("🚀 %s's Coding Activity\n", config.AppConfig.Author)
+	fmt.Printf("──────────────────────────────────────\n")
 	
-	// Activity overview with inline stats
-	fmt.Printf("Activity: %d commits this week • %d this month • %d total\n",
-		totalWeeklyCommits, totalMonthlyCommits, totalCommits)
+	// Activity overview (if any stats are enabled)
+	stats := []string{}
+	if config.AppConfig.DisplayStats.ShowWeeklyCommits {
+		stats = append(stats, fmt.Sprintf("%d commits this week", totalWeeklyCommits))
+	}
+	if config.AppConfig.DisplayStats.ShowMonthlyCommits {
+		stats = append(stats, fmt.Sprintf("%d this month", totalMonthlyCommits))
+	}
+	if config.AppConfig.DisplayStats.ShowTotalCommits {
+		stats = append(stats, fmt.Sprintf("%d total", totalCommits))
+	}
+	if len(stats) > 0 {
+		fmt.Printf("📊 %s\n", strings.Join(stats, " • "))
+		fmt.Println("──────────────────────────────────────")
+	}
 
 	// Active projects section
-	totalProjects := len(cache.Cache)
-	displayCount := min(totalProjects, 5)
-	fmt.Printf("\nActive Projects (%d/%d):\n", displayCount, totalProjects)
-	
-	// Convert map to slice for sorting
-	type repoInfo struct {
-		name       string
-		metadata   scan.RepoMetadata
-		lastCommit time.Time
-	}
-	repos := make([]repoInfo, 0, len(cache.Cache))
-	for path, repo := range cache.Cache {
-		repoName := path[strings.LastIndex(path, "/")+1:]
-		repos = append(repos, repoInfo{
-			name:       repoName,
-			metadata:   repo,
-			lastCommit: repo.LastCommit,
-		})
-	}
-
-	// Sort by most recent activity
-	sort.Slice(repos, func(i, j int) bool {
-		return repos[i].lastCommit.After(repos[j].lastCommit)
-	})
-
-	// Display top 5 most recently active repos
-	for i := 0; i < displayCount; i++ {
-		repo := repos[i]
-		repoName := repo.name
+	if config.AppConfig.DisplayStats.ShowActiveProjects {
+		totalProjects := len(cache.Cache)
+		maxDisplay := config.AppConfig.DisplayStats.MaxProjects
+		if maxDisplay <= 0 {
+			maxDisplay = 5 // default value if not set
+		}
+		displayCount := min(totalProjects, maxDisplay)
 		
-		// Create activity indicator based on commit frequency
-		activity := "⚡"
-		if repo.metadata.WeeklyCommits > 5 {
-			activity = "🔥"
-		} else if repo.metadata.WeeklyCommits == 0 {
-			activity = "💤"
+		// Convert map to slice for sorting
+		type repoInfo struct {
+			name       string
+			metadata   scan.RepoMetadata
+			lastCommit time.Time
+		}
+		repos := make([]repoInfo, 0, len(cache.Cache))
+		for path, repo := range cache.Cache {
+			repoName := path[strings.LastIndex(path, "/")+1:]
+			repos = append(repos, repoInfo{
+				name:       repoName,
+				metadata:   repo,
+				lastCommit: repo.LastCommit,
+			})
 		}
 
-		// Create a compact activity summary
-		summary := fmt.Sprintf("%s %s: %d↑ this week",
-			activity,
-			repoName[:min(len(repoName), 15)],
-			repo.metadata.WeeklyCommits)
+		// Sort by most recent activity
+		sort.Slice(repos, func(i, j int) bool {
+			return repos[i].lastCommit.After(repos[j].lastCommit)
+		})
 
-		// Add streak if exists
-		if repo.metadata.CurrentStreak > 0 {
-			summary += fmt.Sprintf(" • %d day streak", repo.metadata.CurrentStreak)
+		// Display top 5 most recently active repos
+		for i := 0; i < displayCount; i++ {
+			repo := repos[i]
+			repoName := repo.name
+			
+			// Create activity indicator based on commit frequency
+			activity := "⚡"
+			if repo.metadata.WeeklyCommits > 5 {
+				activity = "🔥"
+			} else if repo.metadata.WeeklyCommits == 0 {
+				activity = "💤"
+			}
+
+			// Create a compact activity summary
+			summary := fmt.Sprintf("%s %s: %d↑ this week",
+				activity,
+				repoName[:min(len(repoName), 15)],
+				repo.metadata.WeeklyCommits)
+
+			// Add streak if exists
+			if repo.metadata.CurrentStreak > 0 {
+				summary += fmt.Sprintf(" • 🔥 %d day streak", repo.metadata.CurrentStreak)
+			}
+
+			// Add last commit info
+			daysAgo := time.Since(repo.lastCommit).Hours() / 24
+			if daysAgo < 1 {
+				summary += " • today"
+			} else if daysAgo < 2 {
+				summary += " • yesterday"
+			} else {
+				summary += fmt.Sprintf(" • %d days ago", int(daysAgo))
+			}
+
+			fmt.Println(summary)
 		}
-
-		// Add last commit info
-		daysAgo := time.Now().Sub(repo.lastCommit).Hours() / 24
-		if daysAgo < 1 {
-			summary += " • today"
-		} else if daysAgo < 2 {
-			summary += " • yesterday"
-		} else {
-			summary += fmt.Sprintf(" • %d days ago", int(daysAgo))
-		}
-
-		fmt.Println(summary)
 	}
 
-	// Add insights if available
-	if highestStreak > 0 {
-		fmt.Printf("\n💫 %s is your most active project with a %d day streak!\n",
+	// Insights section
+	if config.AppConfig.DisplayStats.ShowInsights && highestStreak > 0 {
+		fmt.Println("──────────────────────────────────────")
+		fmt.Printf("💫 %s is your most active project with a %d day streak!\n",
 			streakChampRepo[strings.LastIndex(streakChampRepo, "/")+1:],
 			highestStreak)
 	}

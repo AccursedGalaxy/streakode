@@ -14,7 +14,14 @@ type Config struct {
 	DormantThreshold int      `mapstructure:"dormant_threshold"`
 	ScanDirectories []string `mapstructure:"scan_directories"`
 	RefreshInterval int      `mapstructure:"refresh_interval"`
-	DisplayStats    []string `mapstructure:"display_stats"`
+	DisplayStats    struct {
+		ShowWeeklyCommits  bool `mapstructure:"show_weekly_commits"`
+		ShowMonthlyCommits bool `mapstructure:"show_monthly_commits"`
+		ShowTotalCommits   bool `mapstructure:"show_total_commits"`
+		ShowActiveProjects bool `mapstructure:"show_active_projects"`
+		ShowInsights      bool `mapstructure:"show_insights"`
+		MaxProjects       int  `mapstructure:"max_projects"`
+	} `mapstructure:"display_stats"`
 	GoalSettings    struct {
 		WeeklyCommitGoal int `mapstructure:"weekly_commit_goal"`
 	} `mapstructure:"goal_settings"`
