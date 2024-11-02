@@ -95,17 +95,9 @@ streakode stats --profile work
 
 ## Updating 🔄
 
-Streakode includes a built-in update mechanism. To update to the latest version:
+Logic for updating is currently not implemented.
 
-```bash
-streakode update
-```
-
-This will:
-1. Check for new versions
-2. Download the appropriate binary for your system
-3. Automatically replace the current installation
-4. Preserve your configurations and cache
+If you want to update, you can manually download the latest release from the [releases page](https://github.com/AccursedGalaxy/streakode/releases) and replace the current binary.
 
 ## Uninstallation 🗑️
 
