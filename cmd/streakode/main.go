@@ -11,6 +11,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	// These will be set during build time
+	Version   = "dev"
+	CommitSHA = "none"
+	BuildTime = "unknown"
+)
+
 func formatDuration(d time.Duration) string {
 	days := int(d.Hours() / 24)
 	if days == 1 {
@@ -65,10 +72,17 @@ func displayRepoStats(repo *git.Repository, stats *git.RepositoryStats) {
 
 func main() {
 	var rootCmd = &cobra.Command{
-		Use:   "streakode",
-		Short: "Streakode is a developer motivation and insight tool",
-		Long:  `Track your coding streaks, get insights, and stay motivated with Streakode`,
+		Use:     "streakode",
+		Short:   "Streakode is a developer motivation and insight tool",
+		Long:    `Track your coding streaks, get insights, and stay motivated with Streakode`,
+		Version: Version,
 	}
+
+	// Add version template to show more build info
+	rootCmd.SetVersionTemplate(`Streakode Version: {{.Version}}
+Commit: {{.CommitSHA}}
+Built: {{.BuildTime}}
+`)
 
 	var scanCmd = &cobra.Command{
 		Use:   "scan [path]",
@@ -108,8 +122,6 @@ func main() {
 				log.Fatal(err)
 			}
 
-			fmt.Printf("\n🔍 Analyzing %d repositories...\n", len(repos))
-			
 			// Add a small delay to make the scanning feel more natural
 			time.Sleep(500 * time.Millisecond)
 
