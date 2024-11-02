@@ -18,11 +18,8 @@ Streakode is a powerful Git activity tracker that helps developers monitor their
 
 ## Installation 🛠️
 
-### Using Go
-
-```bash
-go install github.com/AccursedGalaxy/streakode@latest
-```
+Proper Installation Flow Coming Soon.
+-> Including automatic config file creation and more.
 
 ### From Releases
 
@@ -98,6 +95,14 @@ streakode stats --profile work
 Logic for updating is currently not implemented.
 
 If you want to update, you can manually download the latest release from the [releases page](https://github.com/AccursedGalaxy/streakode/releases) and replace the current binary.
+
+Or if you cloned the repository, you can pull the latest changes and build the project again.
+
+```bash
+git pull
+make clean
+make install
+```
 
 ## Uninstallation 🗑️
 
