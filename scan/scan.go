@@ -15,6 +15,11 @@ type RepoMetadata struct {
 	Path           string    `json:"path"`
 	LastCommit     time.Time `json:"last_commit"`
 	CommitCount    int       `json:"commit_count"`
+	CurrentStreak  int       `json:"current_streak"`
+	LongestStreak  int       `json:"longest_streak"`
+	WeeklyCommits  int       `json:"weekly_commits"`
+	MonthlyCommits int       `json:"monthly_commits"`
+	MostActiveDay  string    `json:"most_active_day"`
 	LastActivity   string    `json:"last_activity"`
 	AuthorVerified bool      `json:"author_verified"`
 	Dormant        bool      `json:"dormant"`
@@ -34,16 +39,18 @@ func fetchRepoMeta(repoPath, author string) RepoMetadata {
 	if len(output) > 0 {
 		meta.AuthorVerified = true
 
-		// Get last commit date and count
-		lines := strings.Split(string(output), "\n")
-		lastCommitTime, err := time.Parse("2006-01-02 15:04:05 -0700", lines[0])
-		if err == nil {
-			meta.LastCommit = lastCommitTime
-		}
-		meta.CommitCount = len(lines)
+		// Calculate streaks and commit frequencies
+		dates := strings.Split(string(output), "\n")
+		lastCommitTime, _ := time.Parse("2006-01-02 15:04:05 -0700", dates[0])
+		meta.LastCommit = lastCommitTime
+		meta.CommitCount = len(dates)
+		
+		meta.CurrentStreak = calculateStreak(dates)
+		meta.WeeklyCommits = countRecentCommits(dates, 7)
+		meta.MonthlyCommits = countRecentCommits(dates, 30)
+		meta.MostActiveDay = findMostActiveDay(dates)
 
-		// Check if dormant
-		meta.Dormant = time.Since(meta.LastCommit) > time.Duration(config.AppConfig.DormantThreshold) * 24 * time.Hour
+		meta.Dormant = time.Since(lastCommitTime) > time.Duration(config.AppConfig.DormantThreshold) * 24 * time.Hour
 	}
 
 	return meta
@@ -75,4 +82,62 @@ func ScanDirectories(dirs []string, author string) ([]RepoMetadata, error) {
 		}
 	}
 	return repos, nil
+}
+
+// calculateStreak - calculates the current streak of commits
+func calculateStreak(dates []string) int {
+	streak := 0
+	lastDate := time.Now()
+	for _, dateStr := range dates {
+		commitDate, err := time.Parse("2006-01-02 15:04:05 -0700", dateStr)
+		if err != nil {
+			continue
+		}
+		if commitDate.Before(lastDate.AddDate(0, 0, -1)) {
+			break
+		}
+		streak++
+		lastDate = commitDate
+	}
+	return streak
+}
+
+// CountRecentCommits - counts the number of commits in the last n days
+func countRecentCommits(dates []string, days int) int {
+	cutoff := time.Now().AddDate(0, 0, -days)
+	count := 0
+	for _, dateStr := range dates {
+		commitDate, err := time.Parse("2006-01-02 15:04:05 -0700", dateStr)
+		if err != nil {
+			continue
+		}
+		if commitDate.Before(cutoff) {
+			break
+		}
+		count++
+	}
+	return count
+}
+
+// FindMostActiveDay - finds the most active day in the last n days
+func findMostActiveDay(dates []string) string {
+	dayCount := make(map[string]int)
+	for _, dateStr := range dates {
+		commitDate, err := time.Parse("2006-01-02 15:04:05 -0700", dateStr)
+		if err != nil {
+			continue
+		}
+		day := commitDate.Weekday().String()
+		dayCount[day]++
+	}
+
+	maxDay := ""
+	maxCount := 0
+	for day, count := range dayCount {
+		if count > maxCount {
+			maxDay = day
+			maxCount = count
+		}
+	}
+	return maxDay
 }

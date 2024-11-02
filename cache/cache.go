@@ -63,6 +63,9 @@ func SaveCache(filePath string) error {
 
 // RefreshCache - scans directories and updates the cache with new metadata
 func RefreshCache(dirs []string, author string, cacheFilePath string) error {
+	// Initialize a new empty cache
+	InitCache()
+
 	repos, err := scan.ScanDirectories(dirs, author)
 	if err != nil {
 		log.Fatalf("Error scanning directories: %v", err)
