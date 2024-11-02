@@ -6,8 +6,10 @@ import (
 	"os"
 
 	"github.com/AccursedGalaxy/streakode/cache"
+	"github.com/AccursedGalaxy/streakode/cmd"
 	"github.com/AccursedGalaxy/streakode/config"
 	"github.com/AccursedGalaxy/streakode/scan"
+	"github.com/spf13/cobra"
 )
 
 func main() {
@@ -32,4 +34,17 @@ func main() {
 	if len(repos) == 0 {
 		fmt.Println("No active repositories found!")
 	}
+
+
+	rootCmd := &cobra.Command{Use: "streakode"}
+	statsCmd := &cobra.Command{
+		Use: "stats",
+		Short: "Display stats for all active repositories",
+		Run: func(cobraCmd *cobra.Command, args []string) {
+			cmd.DisplayStats()
+		},
+	}
+
+	rootCmd.AddCommand(statsCmd)
+	rootCmd.Execute()
 }
