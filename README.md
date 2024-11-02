@@ -71,6 +71,13 @@ You can create different profiles by creating additional config files:
 ### Basic Commands
 
 ```bash
+# Show version
+streakode --version
+streakode version
+
+# Check and install updates
+streakode update
+
 # Show statistics
 streakode stats
 
@@ -85,6 +92,41 @@ streakode profile -       # Switch to default profile
 # Use different profile for a single command
 streakode stats --profile work
 ```
+
+## Updating 🔄
+
+Streakode includes a built-in update mechanism. To update to the latest version:
+
+```bash
+streakode update
+```
+
+This will:
+1. Check for new versions
+2. Download the appropriate binary for your system
+3. Automatically replace the current installation
+4. Preserve your configurations and cache
+
+## Uninstallation 🗑️
+
+To completely remove Streakode from your system:
+
+```bash
+# Remove the binary
+go clean -i github.com/AccursedGalaxy/streakode
+
+# Remove configuration and cache files
+rm ~/.streakodeconfig*.yaml    # Removes all config files including profiles
+rm ~/.streakode*.cache         # Removes all cache files including profiles
+rm ~/.streakode.state          # Removes the state file
+
+# For Windows users (PowerShell):
+Remove-Item "$env:USERPROFILE\.streakodeconfig*.yaml"
+Remove-Item "$env:USERPROFILE\.streakode*.cache"
+Remove-Item "$env:USERPROFILE\.streakode.state"
+```
+
+Note: If you installed Streakode from a release binary instead of `go install`, simply delete the binary and the configuration files as shown above.
 
 ### Example Output
 

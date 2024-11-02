@@ -1,13 +1,13 @@
 .PHONY: build install clean test release dev-release
 
 # Get the latest git tag
-VERSION ?= $(shell git describe --tags --always --dirty)
+VERSION := $(shell git describe --tags --abbrev=0 2>/dev/null || echo "dev")
 COMMIT_SHA ?= $(shell git rev-parse --short HEAD)
 BUILD_TIME ?= $(shell date -u '+%Y-%m-%d %H:%M:%S')
 
 # Build flags - fixed package path and quotes
 LDFLAGS := -ldflags="-s -w \
-	-X 'main.Version=$(VERSION)' \
+	-X 'main.Version=${VERSION}' \
 	-X 'main.CommitSHA=$(COMMIT_SHA)' \
 	-X 'main.BuildTime=$(BUILD_TIME)'"
 
@@ -42,3 +42,10 @@ release-tag:
 	@if [ -z "$(TAG)" ]; then echo "Please provide a tag, e.g., make release-tag TAG=v1.0.0"; exit 1; fi
 	git tag -a $(TAG) -m "Release $(TAG)"
 	git push origin $(TAG)
+
+# Create a release for multiple platforms
+release:
+	GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o dist/streakode-darwin-amd64
+	GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o dist/streakode-darwin-arm64
+	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o dist/streakode-linux-amd64
+	GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o dist/streakode-windows-amd64.exe
