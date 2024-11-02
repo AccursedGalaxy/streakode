@@ -15,7 +15,7 @@ before:
 
 builds:
   - id: streakode
-    main: ./cmd/streakode/main.go
+    main: .
     binary: streakode
     env:
       - CGO_ENABLED=0

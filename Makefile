@@ -14,7 +14,7 @@ LDFLAGS := -ldflags="-s -w \
 # Build the binary
 build:
 	@mkdir -p bin
-	CGO_ENABLED=0 go build $(LDFLAGS) -o bin/streakode ./cmd/streakode
+	CGO_ENABLED=0 go build $(LDFLAGS) -o bin/streakode .
 
 # Install globally
 install: build
