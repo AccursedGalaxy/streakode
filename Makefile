@@ -1,4 +1,4 @@
-.PHONY: build install clean test release
+.PHONY: build install clean test release dev-release
 
 # Get the latest git tag
 VERSION ?= $(shell git describe --tags --always --dirty)
@@ -30,6 +30,15 @@ clean:
 test:
 	go test ./...
 
-# Create a new release using goreleaser
-release:
+# Development workflow:
+dev: clean build install  # Quick rebuild and install for local testing
+
+# Development release (local testing of goreleaser):
+dev-release:
 	goreleaser release --snapshot --clean
+
+# Create a new release (only run this after git tag):
+release-tag:
+	@if [ -z "$(TAG)" ]; then echo "Please provide a tag, e.g., make release-tag TAG=v1.0.0"; exit 1; fi
+	git tag -a $(TAG) -m "Release $(TAG)"
+	git push origin $(TAG)
