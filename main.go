@@ -44,7 +44,18 @@ func main() {
 			cmd.DisplayStats()
 		},
 	}
+	refreshCmd := &cobra.Command{
+		Use: "refresh",
+		Short: "Refresh the streakode cache",
+		Run: func(cobraCmd *cobra.Command, args []string) {
+			err := cache.RefreshCache(config.AppConfig.ScanDirectories, author, cacheFilePath)
+			if err == nil {
+				fmt.Println("✨ Cache refreshed successfully!")
+			}
+		},
+	}
 
 	rootCmd.AddCommand(statsCmd)
+	rootCmd.AddCommand(refreshCmd)
 	rootCmd.Execute()
 }

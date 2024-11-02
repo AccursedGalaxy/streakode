@@ -24,15 +24,18 @@ func LoadCache(filePath string) error {
 		InitCache()
 		return nil
 	} else if err != nil {
-		log.Fatalf("Error opening cache file: %v", err)
+		log.Printf("Error opening cache file: %v", err)
 		return err
 	}
 	defer file.Close()
 
 	decoder := json.NewDecoder(file)
 	if err := decoder.Decode(&Cache); err != nil {
-		log.Fatalf("Error decoding cache file: %v", err)
+		log.Printf("Error decoding cache file: %v. Recreating cache.", err)
+		file.Close() // Close the file before removing
+		os.Remove(filePath) // Delete the corrupted cache file
 		InitCache()
+		return nil
 	}
 
 	return nil

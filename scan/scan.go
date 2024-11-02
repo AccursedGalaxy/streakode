@@ -12,12 +12,12 @@ import (
 )
 
 type RepoMetadata struct {
-	Path           string `json:"path"`
-	LastCommit     string `json:"last_commit"`
-	CommitCount    int    `json:"commit_count"`
-	LastActivity   string `json:"last_activity"`
-	AuthorVerified bool   `json:"author_verified"`
-	Dormant        bool   `json:"dormant"`
+	Path           string    `json:"path"`
+	LastCommit     time.Time `json:"last_commit"`
+	CommitCount    int       `json:"commit_count"`
+	LastActivity   string    `json:"last_activity"`
+	AuthorVerified bool      `json:"author_verified"`
+	Dormant        bool      `json:"dormant"`
 }
 
 // fetchRepoMeta - gets metadata for a single repository and verifies user
@@ -36,12 +36,14 @@ func fetchRepoMeta(repoPath, author string) RepoMetadata {
 
 		// Get last commit date and count
 		lines := strings.Split(string(output), "\n")
-		meta.LastCommit = lines[0]
+		lastCommitTime, err := time.Parse("2006-01-02 15:04:05 -0700", lines[0])
+		if err == nil {
+			meta.LastCommit = lastCommitTime
+		}
 		meta.CommitCount = len(lines)
 
 		// Check if dormant
-		lastCommitTime, _ := time.Parse("2006-01-02 15:04:05 -0700", meta.LastCommit)
-		meta.Dormant = time.Since(lastCommitTime) > time.Duration(config.AppConfig.DormantThreshold) * 24 * time.Hour
+		meta.Dormant = time.Since(meta.LastCommit) > time.Duration(config.AppConfig.DormantThreshold) * 24 * time.Hour
 	}
 
 	return meta
