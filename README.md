@@ -262,4 +262,122 @@ func DisplayStats() {
 2. **Periodic Refresh and Background Updates**: Implement background processes to keep data fresh without impacting performance.
 3. **Improved Output and Visualization**: Add ASCII charts, progress bars, or visual indicators for achievements.
 
+
 ### Best Practices
+
+To keep the code clean, maintainable, and scalable, follow these best practices throughout the project.
+
+#### 1. **Modular Code Design**
+
+Break the application into discrete modules based on functionality (e.g., `cmd` for CLI commands, `config` for configuration, `cache` for storage). Each module should handle only one aspect of the application, making it easy to understand and extend.
+
+#### 2. **Separation of Concerns**
+
+Each package or file should focus on a single responsibility:
+- **cmd**: Handles command-line interface logic only.
+- **config**: Manages configuration loading, saving, and profile switching.
+- **scan**: Contains logic for repository scanning and filtering.
+- **cache**: Manages data storage, loading, and caching.
+- **utils**: Houses helper functions that can be reused across multiple modules.
+
+#### 3. **Use Interfaces to Decouple Components**
+
+Define interfaces for core components, such as caching and scanning. This allows for easier testing and future flexibility if you want to swap implementations.
+
+Example:
+`````go
+package cache
+
+type CacheManager interface {
+    Load(filePath string) error
+    Save(filePath string) error
+    GetRepoMeta(repoPath string) (RepoMeta, error)
+}
+`````
+
+By programming to interfaces, you can test components independently or swap them out with alternate implementations.
+
+#### 4. **Consistent Error Handling**
+
+Go’s error handling emphasizes explicit error checking. Always handle errors where they occur and avoid swallowing errors. Log any errors that occur so users and developers can diagnose issues.
+
+Example:
+`````go
+package config
+
+func LoadConfig(filePath string) error {
+    if err := viper.ReadInConfig(); err != nil {
+        log.Printf("Error loading config file %s: %v", filePath, err)
+        return err
+    }
+    return nil
+}
+`````
+
+#### 5. **Use Structs for Organized Data Management**
+
+When working with related data, group fields in structs. This approach provides clarity and keeps related data together.
+
+Example:
+`````go
+package scan
+
+type RepoMeta struct {
+    Path           string `json:"path"`
+    LastCommit     string `json:"last_commit"`
+    CommitCount    int    `json:"commit_count"`
+    LastActivity   string `json:"last_activity"`
+    AuthorVerified bool   `json:"author_verified"`
+    Dormant        bool   `json:"dormant"`
+}
+`````
+
+#### 6. **Keep Code DRY (Don’t Repeat Yourself)**
+
+Avoid duplicating code by using helper functions or utility packages. Place commonly used functions, such as date formatting or file handling, in a `utils` package.
+
+#### 7. **Readable and Self-Documenting Code**
+
+Use descriptive variable names, clear function names, and comment where necessary. Aim for self-documenting code, where the purpose of each function and variable is clear from its name alone.
+
+Example:
+`````go
+// FetchRepoMeta retrieves metadata for a single repository and verifies user activity.
+func FetchRepoMeta(repoPath string, author string) RepoMeta {
+    // Implementation here
+}
+`````
+
+#### 8. **Testing and Debugging**
+
+Write tests for each function, especially for complex logic such as scanning and filtering. Testing is essential for reliability, and Go has a built-in testing package that makes this straightforward. Start with unit tests and expand as needed.
+
+Example of a basic test:
+`````go
+package scan
+
+import "testing"
+
+func TestFetchRepoMeta(t *testing.T) {
+    // Set up test case
+    repoPath := "/path/to/test/repo"
+    author := "test-author"
+
+    meta := FetchRepoMeta(repoPath, author)
+    if !meta.AuthorVerified {
+        t.Errorf("Expected author to be verified for repo %s", repoPath)
+    }
+}
+`````
+
+#### 9. **Keep Configuration Flexible and Extensible**
+
+Use a configuration system that is easy to extend with new options. Load the config once at startup and reload as needed if settings change.
+
+#### 10. **Optimize for Performance Early**
+
+To ensure fast shell startup, consider performance during development. Use caching and background updates to minimize impact on the shell.
+
+---
+
+With these best practices in mind, the code will remain easy to understand, test, and extend, allowing for future feature development without significant rewrites. This approach will also help you gain deeper familiarity with Go’s idiomatic patterns and best practices.
