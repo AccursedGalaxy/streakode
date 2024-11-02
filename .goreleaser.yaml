@@ -15,7 +15,7 @@ before:
 
 builds:
   - id: streakode
-    main: ./cmd/streakode/main.go  # Specify the exact path to main.go
+    main: ./cmd/streakode/main.go
     binary: streakode
     env:
       - CGO_ENABLED=0
@@ -53,8 +53,8 @@ changelog:
       - '^docs:'
       - '^test:'
       - '^ci:'
-      - Merge pull request
-      - Merge branch
+      - 'Merge pull request'
+      - 'Merge branch'
 
 brews:
   - name: streakode
