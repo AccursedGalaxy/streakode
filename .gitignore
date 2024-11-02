@@ -2,6 +2,8 @@
 # https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
 #
 # Binaries for programs and plugins
+bin/
+/bin/
 *.exe
 *.exe~
 *.dll
@@ -23,4 +25,9 @@ go.work.sum
 
 # env file
 .env
+
+# dist directory
 dist/
+
+# macOS DS_Store file
+.DS_Store
