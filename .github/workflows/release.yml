@@ -18,10 +18,17 @@ jobs:
       - uses: actions/setup-go@v3
         with:
           go-version: '>=1.20.0'
+      - name: Create GitHub App Token
+        uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: accursedgalaxy
       - uses: goreleaser/goreleaser-action@v4
         with:
           distribution: goreleaser
           version: v1.26.2
           args: release --clean
         env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }} 
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }} 

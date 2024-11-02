@@ -58,10 +58,18 @@ changelog:
 
 brews:
   - name: streakode
-    tap:
+    repository:
       owner: accursedgalaxy
       name: homebrew-tap
+      token: "{{ .Env.GITHUB_TOKEN }}"
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
     folder: Formula
     homepage: "https://github.com/accursedgalaxy/streakode"
     description: "Track your coding streaks and stay motivated"
     license: "MIT"
+    test: |
+      system "#{bin}/streakode --version"
+    install: |
+      bin.install "streakode"
