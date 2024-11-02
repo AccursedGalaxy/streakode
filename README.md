@@ -120,6 +120,9 @@ rm ~/.streakodeconfig*.yaml    # Removes all config files including profiles
 rm ~/.streakode*.cache         # Removes all cache files including profiles
 rm ~/.streakode.state          # Removes the state file
 
+# Single Command For All Files and Configs (Linux/MacOS)
+rm /usr/local/bin/streakode && rm ~/.streakodeconfig* ~/.streakode*.cache ~/.streakode.state
+
 # For Windows users (PowerShell):
 Remove-Item "$env:USERPROFILE\.streakodeconfig*.yaml"
 Remove-Item "$env:USERPROFILE\.streakode*.cache"
