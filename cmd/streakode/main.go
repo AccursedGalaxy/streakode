@@ -20,33 +20,47 @@ func formatDuration(d time.Duration) string {
 }
 
 func displayRepoStats(repo *git.Repository, stats *git.RepositoryStats) {
-	fmt.Printf("\n=== Repository: %s ===\n", repo.Name)
-	fmt.Printf("Total Commits: %d\n", stats.TotalCommits)
-	fmt.Printf("Active Days: %d\n", stats.ActiveDays)
-	fmt.Printf("First Commit: %s (%s ago)\n", 
+	// Header with repo name and commit summary
+	fmt.Printf("\n📁 %s\n", repo.Name)
+	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+	fmt.Printf("📊 %d commits across %d active days\n", 
+		stats.TotalCommits, stats.ActiveDays)
+
+	// Timeline view
+	fmt.Printf("🕒 %s (%s ago) → %s (%s ago)\n",
 		stats.FirstCommit.Timestamp.Format("2006-01-02"),
-		formatDuration(time.Since(stats.FirstCommit.Timestamp)))
-	fmt.Printf("Last Commit: %s (%s ago)\n",
+		formatDuration(time.Since(stats.FirstCommit.Timestamp)),
 		stats.LastCommit.Timestamp.Format("2006-01-02"),
 		formatDuration(time.Since(stats.LastCommit.Timestamp)))
 
-	// Show top 5 most active days
-	type dayCount struct {
-		day   string
-		count int
-	}
-	var days []dayCount
-	for day, count := range stats.CommitsByDay {
-		days = append(days, dayCount{day, count})
-	}
-	sort.Slice(days, func(i, j int) bool {
-		return days[i].count > days[j].count
-	})
+	// Most active days
+	if stats.TotalCommits > 0 {
+		type dayCount struct {
+			day   string
+			count int
+		}
+		var days []dayCount
+		for day, count := range stats.CommitsByDay {
+			days = append(days, dayCount{day, count})
+		}
+		sort.Slice(days, func(i, j int) bool {
+			return days[i].count > days[j].count
+		})
 
-	fmt.Printf("\nMost Active Days:\n")
-	for i := 0; i < len(days) && i < 5; i++ {
-		fmt.Printf("  %s: %d commits\n", days[i].day, days[i].count)
+		fmt.Printf("🔥 Peak activity: ")
+		max := 3
+		if len(days) < max {
+			max = len(days)
+		}
+		for i := 0; i < max; i++ {
+			if i > 0 {
+				fmt.Print(", ")
+			}
+			fmt.Printf("%s (%d)", days[i].day, days[i].count)
+		}
+		fmt.Println()
 	}
+	fmt.Println() // Add extra newline for spacing between repos
 }
 
 func main() {
@@ -72,33 +86,40 @@ func main() {
 				log.Fatal(err)
 			}
 
-			// Print the number of repositories found
-			fmt.Printf("Found %d repositories\n", len(repos))
+			fmt.Printf("\nFound %d repositories! 🎉\n", len(repos))
 			for _, repo := range repos {
-				fmt.Printf("Repository: %s\n", repo.Name)
+				fmt.Printf("• %s\n", repo.Name)
 			}
 		},
 	}
 
 	var statsCmd = &cobra.Command{
-		Use:   "stats",
+		Use:   "stats [path]",
 		Short: "Show your coding stats and streaks",
 		Run: func(cmd *cobra.Command, args []string) {
+			// If no path provided, use current directory
+			if len(args) == 0 {
+				args = append(args, ".")
+			}
+
 			scanner := git.NewScanner(args)
 			repos, err := scanner.ScanForRepositories()
 			if err != nil {
 				log.Fatal(err)
 			}
 
-			// Print the number of repositories found
-			fmt.Printf("Found %d repositories\n", len(repos))
+			fmt.Printf("\n🔍 Analyzing %d repositories...\n", len(repos))
+			
+			// Add a small delay to make the scanning feel more natural
+			time.Sleep(500 * time.Millisecond)
 
 			for _, repo := range repos {
 				stats, err := repo.AnalyzeRepository()
 				if err != nil {
-					fmt.Printf("Error analyzing %s: %v\n", repo.Name, err)
+					fmt.Printf("⚠️  Error analyzing %s: %v\n", repo.Name, err)
 					continue
 				}
+				
 				displayRepoStats(&repo, stats)
 			}
 		},

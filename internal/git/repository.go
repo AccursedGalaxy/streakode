@@ -7,12 +7,6 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
-// Repository represents a Git repository with its basic information
-type RepositoryInfo struct {
-	Path string
-	Name string
-}
-
 type CommitInfo struct {
 	Hash      string
 	Message   string

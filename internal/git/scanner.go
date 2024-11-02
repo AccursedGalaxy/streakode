@@ -28,20 +28,37 @@ func (s *Scanner) ScanForRepositories() ([]Repository, error) {
 	var repos []Repository
 
 	for _, root := range s.RootPaths {
-		err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		// Convert relative paths to absolute
+		absRoot, err := filepath.Abs(root)
+		if err != nil {
+			return nil, err
+		}
+
+		err = filepath.Walk(absRoot, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
 
-			if info.IsDir() && info.Name() == ".git" {
-				repoPath := filepath.Dir(path)
-				repos = append(repos, Repository{
-					Path: repoPath,
-					Name: filepath.Base(repoPath),
-				})
-				return filepath.SkipDir
+			// Skip if we can't read the directory
+			if info == nil {
+				return nil
 			}
 
+			if info.IsDir() {
+				if info.Name() == ".git" {
+					repoPath := filepath.Dir(path)
+					repos = append(repos, Repository{
+						Path: repoPath,
+						Name: filepath.Base(repoPath),
+					})
+					return filepath.SkipDir
+				}
+				
+				// Skip common directories we don't want to scan
+				if info.Name() == "node_modules" || info.Name() == "vendor" {
+					return filepath.SkipDir
+				}
+			}
 			return nil
 		})
 
