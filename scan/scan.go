@@ -119,56 +119,6 @@ func ScanDirectories(dirs []string, author string) ([]RepoMetadata, error) {
 	return repos, nil
 }
 
-// calculateStreak - calculates the current streak of commits
-func calculateStreak(dates []string) int {
-	if len(dates) == 0 {
-		return 0
-	}
-
-	// Initialize variables
-	streak := 1
-	maxStreak := 1
-	lastDate, _ := time.Parse("2006-01-02 15:04:05 -0700", dates[0])
-	currentDay := lastDate.Format("2006-01-02")
-
-	// Create a map to store unique days
-	dayMap := make(map[string]bool)
-	dayMap[currentDay] = true
-
-	for i := 1; i < len(dates); i++ {
-		commitDate, err := time.Parse("2006-01-02 15:04:05 -0700", dates[i])
-		if err != nil {
-			continue
-		}
-
-		commitDay := commitDate.Format("2006-01-02")
-		
-		// Skip if we already counted this day
-		if dayMap[commitDay] {
-			continue
-		}
-		dayMap[commitDay] = true
-
-		// Calculate days between commits
-		dayDiff := lastDate.Sub(commitDate).Hours() / 24
-
-		// If it's consecutive (1 day difference)
-		if dayDiff <= 1.5 { // Allow for timezone differences
-			streak++
-			if streak > maxStreak {
-				maxStreak = streak
-			}
-		} else {
-			// Break in the streak
-			streak = 1
-		}
-
-		lastDate = commitDate
-		currentDay = commitDay
-	}
-
-	return maxStreak
-}
 
 // Add this new function to track both current and longest streaks
 type StreakInfo struct {
