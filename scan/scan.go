@@ -136,6 +136,7 @@ func fetchRepoMeta(repoPath, author string) RepoMetadata {
 			}
 
 			// Debug Printing for entire infrmatoin fetched for testing
+			
 			/*
 			fmt.Printf("\n=== Debug Info for Repository: %s ===\n", repoPath)
 			fmt.Printf("Author Verified: %v\n", meta.AuthorVerified)
@@ -162,7 +163,9 @@ func fetchRepoMeta(repoPath, author string) RepoMetadata {
 						date, stats.Commits, stats.Lines, stats.Files)
 				}
 			}
-			fmt.Printf("\n" */)
+			fmt.Printf("\n" 
+
+			*/
 			
 			break // We found matching commits, no need to try other patterns
 		}
