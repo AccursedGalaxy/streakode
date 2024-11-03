@@ -176,23 +176,27 @@ func calculateStreakInfo(dates []string) StreakInfo {
 
 // countRecentCommits - counts the number of commits in the last n days
 func countRecentCommits(dates []string, days int) int {
-	now := time.Now().UTC()
-	cutoff := now.AddDate(0, 0, -days).Truncate(24 * time.Hour)
+	now := time.Now()
+	cutoff := now.AddDate(0, 0, -days)
 	
-	count := 0
+	// Use a map to track unique days with commits
+	uniqueDays := make(map[string]bool)
+	
 	for _, dateStr := range dates {
 		commitDate, err := time.Parse("2006-01-02 15:04:05 -0700", dateStr)
 		if err != nil {
 			continue
 		}
 		
-		commitDate = commitDate.UTC()
+		// Only count if the commit is after the cutoff and before now
 		if commitDate.After(cutoff) && commitDate.Before(now) {
-			count++
+			// Use date only (no time) as the key to count unique days
+			dateOnly := commitDate.Format("2006-01-02")
+			uniqueDays[dateOnly] = true
 		}
 	}
 
-	return count
+	return len(uniqueDays)
 }
 
 // FindMostActiveDay - finds the most active day in the last n days

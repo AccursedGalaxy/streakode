@@ -108,7 +108,7 @@ func TestCalculateStreak(t *testing.T) {
 	tests := []struct {
 		name     string
 		dates    []string
-		expected int
+		expected StreakInfo
 	}{
 		{
 			name: "Continuous streak",
@@ -117,7 +117,7 @@ func TestCalculateStreak(t *testing.T) {
 				now.Add(-24 * time.Hour).Format("2006-01-02 15:04:05 -0700"),
 				now.Add(-48 * time.Hour).Format("2006-01-02 15:04:05 -0700"),
 			},
-			expected: 3,
+			expected: StreakInfo{Current: 3, Longest: 3},
 		},
 		{
 			name: "Broken streak",
@@ -125,16 +125,16 @@ func TestCalculateStreak(t *testing.T) {
 				now.Format("2006-01-02 15:04:05 -0700"),
 				now.Add(-48 * time.Hour).Format("2006-01-02 15:04:05 -0700"),
 			},
-			expected: 1,
+			expected: StreakInfo{Current: 1, Longest: 1},
 		},
 		{
 			name: "Multiple commits same day",
 			dates: []string{
 				now.Format("2006-01-02 15:04:05 -0700"),
-				now.Format("2006-01-02 15:04:05 -0700"),
-				now.Add(-24 * time.Hour).Format("2006-01-02 15:04:05 -0700"),
+					now.Format("2006-01-02 15:04:05 -0700"),
+					now.Add(-24 * time.Hour).Format("2006-01-02 15:04:05 -0700"),
 			},
-			expected: 2,
+			expected: StreakInfo{Current: 2, Longest: 2},
 		},
 	}
 
@@ -148,10 +148,13 @@ func TestCalculateStreak(t *testing.T) {
 
 func TestCountRecentCommits(t *testing.T) {
 	now := time.Now()
+	yesterday := now.Add(-24 * time.Hour)
+	twoDaysAgo := now.Add(-48 * time.Hour)
+	
 	dates := []string{
 		now.Format("2006-01-02 15:04:05 -0700"),
-		now.Add(-24 * time.Hour).Format("2006-01-02 15:04:05 -0700"),
-		now.Add(-48 * time.Hour).Format("2006-01-02 15:04:05 -0700"),
+		yesterday.Format("2006-01-02 15:04:05 -0700"),
+		twoDaysAgo.Format("2006-01-02 15:04:05 -0700"),
 	}
 
 	tests := []struct {
