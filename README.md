@@ -35,10 +35,19 @@ make install
 
 ## Configuration 📝
 
+First, check your Git author configuration:
+
+```bash
+streakode author
+```
+
+This will show your global and local Git configurations. Use the displayed name in your Streakode config file.
+
 Create a configuration file at `~/.streakodeconfig.yaml`:
 
 ```yaml
-author: "Your Name"
+# Use the name exactly as shown by 'streakode author' command
+author: "Your Name"  
 dormant_threshold: 90  # days
 scan_directories:
   - "~/github"
@@ -57,11 +66,15 @@ goal_settings:
   weekly_commit_goal: 10
 ```
 
+> **Important**: The `author` field must match your Git author name exactly as it appears in your Git configuration. This ensures Streakode only tracks commits made by you. Use `streakode author` to verify your Git author name.
+
 ### Multiple Profiles
 
 You can create different profiles by creating additional config files:
 - Work profile: `~/.streakodeconfig_work.yaml`
 - Home profile: `~/.streakodeconfig_home.yaml`
+
+Each profile can have a different author configuration if needed (useful if you use different Git identities for work/personal projects).
 
 ## Usage 💻
 
@@ -72,8 +85,8 @@ You can create different profiles by creating additional config files:
 streakode --version
 streakode version
 
-# Check and install updates
-streakode update
+# Check your Git author configuration
+streakode author
 
 # Show statistics
 streakode stats
