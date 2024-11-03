@@ -8,13 +8,27 @@ Streakode is a powerful Git activity tracker that helps developers monitor their
 
 ## Features ✨
 
-- 📊 Track commit streaks and coding patterns
-- 🔄 Multiple profile support (work, personal, etc.)
-- 📈 Weekly, monthly, and total commit statistics
-- ⚡ Fast, cached repository scanning
-- 🎯 Goal tracking and insights
-- 🏠 Expandable home directory paths (~/)
-- 💾 Persistent profile state management
+- 📊 Enhanced commit tracking and statistics
+  - Detailed weekly/monthly commit patterns
+  - Code changes tracking (+/-) per repository
+  - Language statistics and peak coding hours
+  - Customizable activity indicators
+- 🎨 Highly configurable display options
+  - Customizable table layouts and styles
+  - Color themes support
+  - Multiple insight views
+- 🔄 Smart caching system
+  - Efficient repository scanning
+  - Selective cache updates
+  - Version-aware cache management
+- 🎯 Advanced goal tracking
+  - Weekly commit goals
+  - Progress visualization
+  - Customizable thresholds
+- 👤 Profile management
+  - Work/personal separation
+  - Profile-specific configurations
+  - Easy profile switching
 
 ## Installation 🛠️
 
@@ -35,32 +49,61 @@ make install
 
 ## Configuration 📝
 
-First, check your Git author configuration:
-
-```bash
-streakode author
-```
-
-This will show your global and local Git configurations. Use the displayed name in your Streakode config file.
-
 Create a configuration file at `~/.streakodeconfig.yaml`:
 
 ```yaml
-# Use the name exactly as shown by 'streakode author' command
-author: "Your Name"  
-dormant_threshold: 90  # days
+author: "Your Name"
+dormant_threshold: 90
 scan_directories:
   - "~/github"
   - "~/work/projects"
-refresh_interval: 24   # hours
+refresh_interval: 24
 
 display_stats:
+  show_welcome_message: true
   show_weekly_commits: true
   show_monthly_commits: true
   show_total_commits: true
   show_active_projects: true
   show_insights: true
   max_projects: 5
+  
+  # Table styling
+  table_style:
+    show_border: false
+    column_separator: " "
+    center_separator: "─"
+    header_alignment: "center"
+    show_header_line: false
+    show_row_lines: false
+    min_column_widths:
+      repository: 20
+      weekly: 8
+      streak: 8
+      changes: 13
+      activity: 10
+
+  # Activity indicators
+  activity_indicators:
+    high_activity: "🔥"
+    normal_activity: "⚡"
+    no_activity: "💤"
+    streak_record: "🏆"
+    active_streak: "🔥"
+
+  # Activity thresholds
+  thresholds:
+    high_activity: 10
+
+  # Insight settings
+  insight_settings:
+    top_languages_count: 3
+    show_daily_average: true
+    show_top_languages: true
+    show_peak_coding: true
+    show_weekly_summary: true
+    show_weekly_goal: true
+    show_most_active: true
 
 goal_settings:
   weekly_commit_goal: 10
@@ -69,17 +112,33 @@ colors:
   header_color: "#FF96B4"
   section_color: "#87CEEB"
   divider_color: "#808080"
+
+detailed_stats: true
+
+language_settings:
+  excluded_extensions: [".yaml", ".txt", ".md"]
+  excluded_languages: ["YAML", "Text", "Markdown"]
+  minimum_lines: 100
 ```
 
-> **Important**: The `author` field must match your Git author name exactly as it appears in your Git configuration. This ensures Streakode only tracks commits made by you. Use `streakode author` to verify your Git author name.
+### Example Output
 
-### Multiple Profiles
-
-You can create different profiles by creating additional config files:
-- Work profile: `~/.streakodeconfig_work.yaml`
-- Home profile: `~/.streakodeconfig_home.yaml`
-
-Each profile can have a different author configuration if needed (useful if you use different Git identities for work/personal projects).
+```
+🚀 Your Name's Coding Activity
+──────────────────────────────────────
+📊 3 commits this week • 12 this month
+──────────────────────────────────────
+Repository    Weekly    Streak    Changes      Activity
+🔥 project-a    5↑       3d🔥      +150/-50    today
+⚡ project-b    2↑       1d        +80/-20     2d ago
+💤 project-c    0↑       0d        +0/-0       5d ago
+──────────────────────────────────────
+📈 Weekly Summary: 7 commits, +230/-70 lines
+📊 Daily Average: 1.0 commits
+💻 Top Languages: Go:2.5k, Python:1.2k, JavaScript:0.8k
+⏰ Peak Coding: 14:00-15:00 (3 commits)
+🎯 Weekly Goal: 70% (7/10 commits)
+```
 
 ## Usage 💻
 
@@ -145,19 +204,6 @@ Remove-Item "$env:USERPROFILE\.streakode.state"
 ```
 
 Note: If you installed Streakode from a release binary instead of `go install`, simply delete the binary and the configuration files as shown above.
-
-### Example Output
-
-```
-🚀 Your Name's Coding Activity
-──────────────────────────────────────
-📊 3 commits this week • 12 this month • 156 total
-──────────────────────────────────────
-⚡ awesome-project: 2↑ this week • 🔥 2 day streak • today
-⚡ cool-app: 1↑ this week • 2 days ago
-──────────────────────────────────────
-💫 awesome-project is your most active project with a 2 day streak!
-```
 
 ## Contributing 🤝
 
