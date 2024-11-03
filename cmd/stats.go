@@ -40,6 +40,8 @@ func DisplayStats() {
 	// -> currently the (line breaks) we have setup are displayed regardless.
 	// -> need to think of a way to dynamically genearte nice compact reports regardless of what user has enabled/disabled
 
+  // TODO: Come up with a uniform way to display emojis and stats across different metrics
+
 	// Always show header, as it provides context
 	fmt.Printf("🚀 %s's Coding Activity\n", config.AppConfig.Author)
 	fmt.Printf("──────────────────────────────────────\n")
