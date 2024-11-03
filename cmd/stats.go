@@ -167,7 +167,7 @@ func buildProjectsSection() string {
 		repoName := repo.name
 		
 		activity := "⚡"
-		if repo.metadata.WeeklyCommits > 5 {
+		if repo.metadata.WeeklyCommits > 10 {
 			activity = "🔥"
 		} else if repo.metadata.WeeklyCommits == 0 {
 			activity = "💤"

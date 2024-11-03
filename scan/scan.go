@@ -179,24 +179,20 @@ func countRecentCommits(dates []string, days int) int {
 	now := time.Now()
 	cutoff := now.AddDate(0, 0, -days)
 	
-	// Use a map to track unique days with commits
-	uniqueDays := make(map[string]bool)
-	
+	count := 0
 	for _, dateStr := range dates {
 		commitDate, err := time.Parse("2006-01-02 15:04:05 -0700", dateStr)
 		if err != nil {
 			continue
 		}
 		
-		// Only count if the commit is after the cutoff and before now
+		// Count all commits within the time range
 		if commitDate.After(cutoff) && commitDate.Before(now) {
-			// Use date only (no time) as the key to count unique days
-			dateOnly := commitDate.Format("2006-01-02")
-			uniqueDays[dateOnly] = true
+			count++
 		}
 	}
 
-	return len(uniqueDays)
+	return count
 }
 
 // FindMostActiveDay - finds the most active day in the last n days
