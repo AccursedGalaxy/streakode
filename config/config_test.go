@@ -29,8 +29,74 @@ func TestValidateConfig(t *testing.T) {
 					ShowActiveProjects bool `mapstructure:"show_active_projects"`
 					ShowInsights      bool `mapstructure:"show_insights"`
 					MaxProjects       int  `mapstructure:"max_projects"`
+					TableStyle         struct {
+						ShowBorder        bool   `mapstructure:"show_border"`
+						ColumnSeparator   string `mapstructure:"column_separator"`
+						CenterSeparator   string `mapstructure:"center_separator"`
+						HeaderAlignment   string `mapstructure:"header_alignment"`
+						ShowHeaderLine    bool   `mapstructure:"show_header_line"`
+						ShowRowLines      bool   `mapstructure:"show_row_lines"`
+						MinColumnWidths   struct {
+							Repository int `mapstructure:"repository"`
+							Weekly    int `mapstructure:"weekly"`
+							Streak    int `mapstructure:"streak"`
+							Changes   int `mapstructure:"changes"`
+							Activity  int `mapstructure:"activity"`
+						} `mapstructure:"min_column_widths"`
+					} `mapstructure:"table_style"`
+					ActivityIndicators struct {
+						HighActivity    string `mapstructure:"high_activity"`
+						NormalActivity  string `mapstructure:"normal_activity"`
+						NoActivity      string `mapstructure:"no_activity"`
+						StreakRecord    string `mapstructure:"streak_record"`
+						ActiveStreak    string `mapstructure:"active_streak"`
+					} `mapstructure:"activity_indicators"`
+					Thresholds struct {
+						HighActivity int `mapstructure:"high_activity"`
+					} `mapstructure:"thresholds"`
+					InsightSettings struct {
+						TopLanguagesCount int  `mapstructure:"top_languages_count"`
+						ShowDailyAverage  bool `mapstructure:"show_daily_average"`
+						ShowTopLanguages  bool `mapstructure:"show_top_languages"`
+						ShowPeakCoding    bool `mapstructure:"show_peak_coding"`
+						ShowWeeklySummary bool `mapstructure:"show_weekly_summary"`
+						ShowWeeklyGoal    bool `mapstructure:"show_weekly_goal"`
+						ShowMostActive    bool `mapstructure:"show_most_active"`
+					} `mapstructure:"insight_settings"`
 				}{
 					MaxProjects: 5,
+					TableStyle: struct {
+						ShowBorder        bool   `mapstructure:"show_border"`
+						ColumnSeparator   string `mapstructure:"column_separator"`
+						CenterSeparator   string `mapstructure:"center_separator"`
+						HeaderAlignment   string `mapstructure:"header_alignment"`
+						ShowHeaderLine    bool   `mapstructure:"show_header_line"`
+						ShowRowLines      bool   `mapstructure:"show_row_lines"`
+						MinColumnWidths   struct {
+							Repository int `mapstructure:"repository"`
+							Weekly    int `mapstructure:"weekly"`
+							Streak    int `mapstructure:"streak"`
+							Changes   int `mapstructure:"changes"`
+							Activity  int `mapstructure:"activity"`
+						} `mapstructure:"min_column_widths"`
+					}{
+						ShowBorder:      true,
+						ColumnSeparator: "│",
+						HeaderAlignment: "center",
+					},
+					ActivityIndicators: struct {
+						HighActivity    string `mapstructure:"high_activity"`
+						NormalActivity  string `mapstructure:"normal_activity"`
+						NoActivity      string `mapstructure:"no_activity"`
+						StreakRecord    string `mapstructure:"streak_record"`
+						ActiveStreak    string `mapstructure:"active_streak"`
+					}{
+						HighActivity:   "🔥",
+						NormalActivity: "⚡",
+						NoActivity:     "💤",
+						StreakRecord:   "🏆",
+						ActiveStreak:   "🔥",
+					},
 				},
 				GoalSettings: struct {
 					WeeklyCommitGoal int `mapstructure:"weekly_commit_goal"`
@@ -103,8 +169,79 @@ func TestValidateConfig(t *testing.T) {
 					ShowActiveProjects bool `mapstructure:"show_active_projects"`
 					ShowInsights      bool `mapstructure:"show_insights"`
 					MaxProjects       int  `mapstructure:"max_projects"`
+					TableStyle         struct {
+						ShowBorder        bool   `mapstructure:"show_border"`
+						ColumnSeparator   string `mapstructure:"column_separator"`
+						CenterSeparator   string `mapstructure:"center_separator"`
+						HeaderAlignment   string `mapstructure:"header_alignment"`
+						ShowHeaderLine    bool   `mapstructure:"show_header_line"`
+						ShowRowLines      bool   `mapstructure:"show_row_lines"`
+						MinColumnWidths   struct {
+							Repository int `mapstructure:"repository"`
+							Weekly    int `mapstructure:"weekly"`
+							Streak    int `mapstructure:"streak"`
+							Changes   int `mapstructure:"changes"`
+							Activity  int `mapstructure:"activity"`
+						} `mapstructure:"min_column_widths"`
+					} `mapstructure:"table_style"`
+					ActivityIndicators struct {
+						HighActivity    string `mapstructure:"high_activity"`
+						NormalActivity  string `mapstructure:"normal_activity"`
+						NoActivity      string `mapstructure:"no_activity"`
+						StreakRecord    string `mapstructure:"streak_record"`
+						ActiveStreak    string `mapstructure:"active_streak"`
+					} `mapstructure:"activity_indicators"`
+					Thresholds struct {
+						HighActivity int `mapstructure:"high_activity"`
+					} `mapstructure:"thresholds"`
+					InsightSettings struct {
+						TopLanguagesCount int  `mapstructure:"top_languages_count"`
+						ShowDailyAverage  bool `mapstructure:"show_daily_average"`
+						ShowTopLanguages  bool `mapstructure:"show_top_languages"`
+						ShowPeakCoding    bool `mapstructure:"show_peak_coding"`
+						ShowWeeklySummary bool `mapstructure:"show_weekly_summary"`
+						ShowWeeklyGoal    bool `mapstructure:"show_weekly_goal"`
+						ShowMostActive    bool `mapstructure:"show_most_active"`
+					} `mapstructure:"insight_settings"`
 				}{
 					MaxProjects: 0,
+					TableStyle: struct {
+						ShowBorder        bool   `mapstructure:"show_border"`
+						ColumnSeparator   string `mapstructure:"column_separator"`
+						CenterSeparator   string `mapstructure:"center_separator"`
+						HeaderAlignment   string `mapstructure:"header_alignment"`
+						ShowHeaderLine    bool   `mapstructure:"show_header_line"`
+						ShowRowLines      bool   `mapstructure:"show_row_lines"`
+						MinColumnWidths   struct {
+							Repository int `mapstructure:"repository"`
+							Weekly    int `mapstructure:"weekly"`
+							Streak    int `mapstructure:"streak"`
+							Changes   int `mapstructure:"changes"`
+							Activity  int `mapstructure:"activity"`
+						} `mapstructure:"min_column_widths"`
+					}{
+						ShowBorder:      true,
+						ColumnSeparator: "│",
+						HeaderAlignment: "center",
+					},
+					ActivityIndicators: struct {
+						HighActivity    string `mapstructure:"high_activity"`
+						NormalActivity  string `mapstructure:"normal_activity"`
+						NoActivity      string `mapstructure:"no_activity"`
+						StreakRecord    string `mapstructure:"streak_record"`
+						ActiveStreak    string `mapstructure:"active_streak"`
+					}{
+						HighActivity:   "🔥",
+						NormalActivity: "⚡",
+						NoActivity:     "💤",
+						StreakRecord:   "🏆",
+						ActiveStreak:   "🔥",
+					},
+				},
+				GoalSettings: struct {
+					WeeklyCommitGoal int `mapstructure:"weekly_commit_goal"`
+				}{
+					WeeklyCommitGoal: 10,
 				},
 			},
 			wantError: true,
