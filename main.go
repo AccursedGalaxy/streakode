@@ -45,8 +45,12 @@ func main() {
 				cacheFilePath := getCacheFilePath(profile)
 				config.LoadConfig(profile)
 				cache.InitCache()
-				cache.LoadCache(cacheFilePath)
-				cache.RefreshCache(config.AppConfig.ScanDirectories, config.AppConfig.Author, cacheFilePath)
+				if err := cache.LoadCache(cacheFilePath); err != nil {
+					fmt.Printf("Error loading cache: %v\n", err)
+				}
+				if err := cache.RefreshCache(config.AppConfig.ScanDirectories, config.AppConfig.Author, cacheFilePath); err != nil {
+					fmt.Printf("Error refreshing cache: %v\n", err)
+				}
 			},
 	}
 
