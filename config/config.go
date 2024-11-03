@@ -24,6 +24,40 @@ type Config struct {
 		ShowActiveProjects bool `mapstructure:"show_active_projects"`
 		ShowInsights      bool `mapstructure:"show_insights"`
 		MaxProjects       int  `mapstructure:"max_projects"`
+		TableStyle struct {
+			ShowBorder        bool   `mapstructure:"show_border"`
+			ColumnSeparator   string `mapstructure:"column_separator"`
+			CenterSeparator   string `mapstructure:"center_separator"`
+			HeaderAlignment   string `mapstructure:"header_alignment"`
+			ShowHeaderLine    bool   `mapstructure:"show_header_line"`
+			ShowRowLines      bool   `mapstructure:"show_row_lines"`
+			MinColumnWidths   struct {
+				Repository int `mapstructure:"repository"`
+				Weekly    int `mapstructure:"weekly"`
+				Streak    int `mapstructure:"streak"`
+				Changes   int `mapstructure:"changes"`
+				Activity  int `mapstructure:"activity"`
+			} `mapstructure:"min_column_widths"`
+		} `mapstructure:"table_style"`
+		ActivityIndicators struct {
+			HighActivity    string `mapstructure:"high_activity"`     // 🔥
+			NormalActivity string `mapstructure:"normal_activity"`    // ⚡
+			NoActivity     string `mapstructure:"no_activity"`        // 💤
+			StreakRecord   string `mapstructure:"streak_record"`      // 🏆
+			ActiveStreak   string `mapstructure:"active_streak"`      // 🔥
+		} `mapstructure:"activity_indicators"`
+		Thresholds struct {
+			HighActivity int `mapstructure:"high_activity"` // commits > 10 for high activity
+		} `mapstructure:"thresholds"`
+		InsightSettings struct {
+			TopLanguagesCount int  `mapstructure:"top_languages_count"` // number of top languages to show
+			ShowDailyAverage  bool `mapstructure:"show_daily_average"`
+			ShowTopLanguages  bool `mapstructure:"show_top_languages"`
+			ShowPeakCoding    bool `mapstructure:"show_peak_coding"`
+			ShowWeeklySummary bool `mapstructure:"show_weekly_summary"`
+			ShowWeeklyGoal    bool `mapstructure:"show_weekly_goal"`
+			ShowMostActive    bool `mapstructure:"show_most_active"`
+		} `mapstructure:"insight_settings"`
 	} `mapstructure:"display_stats"`
 	GoalSettings    struct {
 		WeeklyCommitGoal int `mapstructure:"weekly_commit_goal"`
@@ -34,6 +68,11 @@ type Config struct {
 		DividerColor string `mapstructure:"divider_color"`
 	}
 	DetailedStats bool `mapstructure:"detailed_stats" yaml:"detailed_stats"`
+	LanguageSettings struct {
+		ExcludedExtensions []string `mapstructure:"excluded_extensions"` // e.g., [".yaml", ".txt", ".md"]
+		ExcludedLanguages  []string `mapstructure:"excluded_languages"`  // e.g., ["YAML", "Text", "Markdown"]
+		MinimumLines      int      `mapstructure:"minimum_lines"`       // Minimum lines for a language to be included
+	} `mapstructure:"language_settings"`
 }
 
 type State struct {
@@ -77,6 +116,63 @@ func (c *Config) ValidateConfig() error {
 	if c.Colors.DividerColor == "" {
 		c.Colors.DividerColor = "#808080"
 	}
+
+	// Validate table style
+	if c.DisplayStats.TableStyle.MinColumnWidths.Repository < 10 {
+		c.DisplayStats.TableStyle.MinColumnWidths.Repository = 20
+	}
+	if c.DisplayStats.TableStyle.MinColumnWidths.Weekly < 5 {
+		c.DisplayStats.TableStyle.MinColumnWidths.Weekly = 8
+	}
+	if c.DisplayStats.TableStyle.MinColumnWidths.Streak < 5 {
+		c.DisplayStats.TableStyle.MinColumnWidths.Streak = 8
+	}
+	if c.DisplayStats.TableStyle.MinColumnWidths.Changes < 8 {
+		c.DisplayStats.TableStyle.MinColumnWidths.Changes = 13
+	}
+	if c.DisplayStats.TableStyle.MinColumnWidths.Activity < 5 {
+		c.DisplayStats.TableStyle.MinColumnWidths.Activity = 10
+	}
+
+	// Set default activity indicators if not specified
+	if c.DisplayStats.ActivityIndicators.HighActivity == "" {
+		c.DisplayStats.ActivityIndicators.HighActivity = "🔥"
+	}
+	if c.DisplayStats.ActivityIndicators.NormalActivity == "" {
+		c.DisplayStats.ActivityIndicators.NormalActivity = "⚡"
+	}
+	if c.DisplayStats.ActivityIndicators.NoActivity == "" {
+		c.DisplayStats.ActivityIndicators.NoActivity = "💤"
+	}
+	if c.DisplayStats.ActivityIndicators.StreakRecord == "" {
+		c.DisplayStats.ActivityIndicators.StreakRecord = "🏆"
+	}
+	if c.DisplayStats.ActivityIndicators.ActiveStreak == "" {
+		c.DisplayStats.ActivityIndicators.ActiveStreak = "🔥"
+	}
+
+	// Validate thresholds
+	if c.DisplayStats.Thresholds.HighActivity <= 0 {
+		c.DisplayStats.Thresholds.HighActivity = 10
+	}
+
+	// Validate insight settings
+	if c.DisplayStats.InsightSettings.TopLanguagesCount <= 0 {
+		c.DisplayStats.InsightSettings.TopLanguagesCount = 3
+	}
+
+	// Validate language settings
+	if c.LanguageSettings.MinimumLines < 0 {
+		c.LanguageSettings.MinimumLines = 0
+	}
+
+	// Normalize excluded extensions
+	for i, ext := range c.LanguageSettings.ExcludedExtensions {
+		if !strings.HasPrefix(ext, ".") {
+			c.LanguageSettings.ExcludedExtensions[i] = "." + ext
+		}
+	}
+
 	return nil
 }
 

@@ -26,11 +26,14 @@ func DisplayStats() {
 	testBuf := new(bytes.Buffer)
 	testTable := tablewriter.NewWriter(testBuf)
 	testTable.SetHeader([]string{"Repository", "Weekly", "Streak", "Changes", "Activity"})
-	testTable.SetColMinWidth(0, 20)  // Repository
-	testTable.SetColMinWidth(1, 8)   // Weekly
-	testTable.SetColMinWidth(2, 8)   // Streak
-	testTable.SetColMinWidth(3, 13)  // Changes
-	testTable.SetColMinWidth(4, 10)  // Activity
+	
+	// Use configured column widths
+	cfg := config.AppConfig.DisplayStats.TableStyle.MinColumnWidths
+	testTable.SetColMinWidth(0, cfg.Repository)
+	testTable.SetColMinWidth(1, cfg.Weekly)
+	testTable.SetColMinWidth(2, cfg.Streak)
+	testTable.SetColMinWidth(3, cfg.Changes)
+	testTable.SetColMinWidth(4, cfg.Activity)
 	testTable.Render()
 	
 	// Get the width from the rendered test table
@@ -138,29 +141,29 @@ func buildProjectsSection() string {
 	buf := new(bytes.Buffer)
 	table := tablewriter.NewWriter(buf)
 
-	// Configure table style
+	// Configure table using config values
+	cfg := config.AppConfig.DisplayStats.TableStyle
 	table.SetHeader([]string{"Repository", "Weekly", "Streak", "Changes", "Activity"})
-	table.SetBorder(false)
-	table.SetColumnSeparator("│")
-	table.SetCenterSeparator("┼")
-	table.SetHeaderAlignment(tablewriter.ALIGN_CENTER)
-	table.SetAlignment(tablewriter.ALIGN_CENTER)
-	table.SetHeaderLine(true)
-	table.SetRowLine(false)
+	table.SetBorder(cfg.ShowBorder)
+	table.SetColumnSeparator(cfg.ColumnSeparator)
+	table.SetCenterSeparator(cfg.CenterSeparator)
+	table.SetHeaderAlignment(getAlignment(cfg.HeaderAlignment))
+	table.SetHeaderLine(cfg.ShowHeaderLine)
+	table.SetRowLine(cfg.ShowRowLines)
 	
-	// Set minimum column widths
-	table.SetColMinWidth(0, 20)  // Repository
-	table.SetColMinWidth(1, 8)   // Weekly
-	table.SetColMinWidth(2, 8)   // Streak
-	table.SetColMinWidth(3, 13)  // Changes
-	table.SetColMinWidth(4, 10)  // Activity
-	
+	// Set configured column widths
+	table.SetColMinWidth(0, cfg.MinColumnWidths.Repository)
+	table.SetColMinWidth(1, cfg.MinColumnWidths.Weekly)
+	table.SetColMinWidth(2, cfg.MinColumnWidths.Streak)
+	table.SetColMinWidth(3, cfg.MinColumnWidths.Changes)
+	table.SetColMinWidth(4, cfg.MinColumnWidths.Activity)
+
 	// All columns centered
 	table.SetColumnAlignment([]int{
 		tablewriter.ALIGN_CENTER,
 		tablewriter.ALIGN_CENTER,
 		tablewriter.ALIGN_CENTER,
-		tablewriter.ALIGN_CENTER,
+			tablewriter.ALIGN_CENTER,
 		tablewriter.ALIGN_CENTER,
 	})
 
@@ -169,20 +172,23 @@ func buildProjectsSection() string {
 		repo := repos[i]
 		meta := repo.metadata
 
-		// Determine activity icon
-		activity := "⚡"
-		if meta.WeeklyCommits > 10 {
-			activity = "🔥"
+		// Use configured activity indicators
+		indicators := config.AppConfig.DisplayStats.ActivityIndicators
+		thresholds := config.AppConfig.DisplayStats.Thresholds
+		
+		activity := indicators.NormalActivity
+		if meta.WeeklyCommits > thresholds.HighActivity {
+			activity = indicators.HighActivity
 		} else if meta.WeeklyCommits == 0 {
-			activity = "💤"
+			activity = indicators.NoActivity
 		}
 
-		// Format streak
+		// Format streak with configured indicators
 		streakStr := fmt.Sprintf("%dd", meta.CurrentStreak)
 		if meta.CurrentStreak == meta.LongestStreak && meta.CurrentStreak > 0 {
-			streakStr += "🏆"
+			streakStr += indicators.StreakRecord
 		} else if meta.CurrentStreak > 0 {
-			streakStr += "🔥"
+			streakStr += indicators.ActiveStreak
 		}
 
 		// Format activity
@@ -215,7 +221,7 @@ func buildProjectsSection() string {
 	return buf.String()
 }
 
-func formatLanguages(stats map[string]int) string {
+func formatLanguages(stats map[string]int, topCount int) string {
 	// Convert map to slice for sorting
 	type langStat struct {
 		lang  string
@@ -234,7 +240,7 @@ func formatLanguages(stats map[string]int) string {
 	
 	// Format top 3 languages
 	var formatted []string
-	for i := 0; i < min(len(langs), 3); i++ {
+	for i := 0; i < min(len(langs), topCount); i++ {
 		if langs[i].lines > 0 {
 			formatted = append(formatted, fmt.Sprintf("%s:%.1fk", 
 				langs[i].lang, float64(langs[i].lines)/1000))
@@ -249,6 +255,8 @@ func buildInsightsSection() string {
 		return ""
 	}
 
+	insights := config.AppConfig.DisplayStats.InsightSettings
+	
 	if config.AppConfig.DetailedStats {
 		buf := new(bytes.Buffer)
 		table := tablewriter.NewWriter(buf)
@@ -301,23 +309,29 @@ func buildInsightsSection() string {
 			}
 		}
 
-		// Add rows to table
-		table.Append([]string{"📈", "Weekly Summary:", fmt.Sprintf("%d commits, +%d/-%d lines", 
-			totalWeeklyCommits, totalAdditions, totalDeletions)})
+		// Only add configured insight rows
+		if insights.ShowWeeklySummary {
+			table.Append([]string{"📈", "Weekly Summary:", fmt.Sprintf("%d commits, +%d/-%d lines", 
+				totalWeeklyCommits, totalAdditions, totalDeletions)})
+		}
 		
-		table.Append([]string{"📊", "Daily Average:", 
-			fmt.Sprintf("%.1f commits", float64(totalWeeklyCommits)/7.0)})
+		if insights.ShowDailyAverage {
+			table.Append([]string{"📊", "Daily Average:", 
+				fmt.Sprintf("%.1f commits", float64(totalWeeklyCommits)/7.0)})
+		}
 
-		if len(languageStats) > 0 {
-			langs := formatLanguages(languageStats)
+		if insights.ShowTopLanguages && len(languageStats) > 0 {
+			langs := formatLanguages(languageStats, insights.TopLanguagesCount)
 			table.Append([]string{"💻", "Top Languages:", langs})
 		}
 
-		table.Append([]string{"⏰", "Peak Coding:", 
-			fmt.Sprintf("%02d:00-%02d:00 (%d commits)", 
-			peakHour, (peakHour+1)%24, peakCommits)})
+		if insights.ShowPeakCoding {
+			table.Append([]string{"⏰", "Peak Coding:", 
+				fmt.Sprintf("%02d:00-%02d:00 (%d commits)", 
+				peakHour, (peakHour+1)%24, peakCommits)})
+		}
 
-		if config.AppConfig.GoalSettings.WeeklyCommitGoal > 0 {
+		if insights.ShowWeeklyGoal && config.AppConfig.GoalSettings.WeeklyCommitGoal > 0 {
 			progress := float64(totalWeeklyCommits) / float64(config.AppConfig.GoalSettings.WeeklyCommitGoal) * 100
 			table.Append([]string{"🎯", "Weekly Goal:", 
 				fmt.Sprintf("%d%% (%d/%d commits)", 
@@ -328,18 +342,32 @@ func buildInsightsSection() string {
 		return buf.String()
 	} else {
 		// Simple insights for non-detailed view
-		var mostProductiveRepo string
-		maxActivity := 0
-		for path, repo := range cache.Cache {
-			if repo.WeeklyCommits > maxActivity {
-				maxActivity = repo.WeeklyCommits
-				mostProductiveRepo = path[strings.LastIndex(path, "/")+1:]
+		if insights.ShowMostActive {
+			var mostProductiveRepo string
+			maxActivity := 0
+			for path, repo := range cache.Cache {
+				if repo.WeeklyCommits > maxActivity {
+					maxActivity = repo.WeeklyCommits
+					mostProductiveRepo = path[strings.LastIndex(path, "/")+1:]
+				}
 			}
-		}
-		if mostProductiveRepo != "" {
-			return fmt.Sprintf("  🌟 Most active: %s", mostProductiveRepo)
+			if mostProductiveRepo != "" {
+				return fmt.Sprintf("  🌟 Most active: %s", mostProductiveRepo)
+			}
 		}
 	}
 
 	return ""
+}
+
+// Helper function to convert string alignment to tablewriter constant
+func getAlignment(alignment string) int {
+	switch strings.ToLower(alignment) {
+	case "left":
+		return tablewriter.ALIGN_LEFT
+	case "right":
+		return tablewriter.ALIGN_RIGHT
+	default:
+		return tablewriter.ALIGN_CENTER
+	}
 }

@@ -122,13 +122,26 @@ func (m *RepoMetadata) initDetailedStats() {
 
 func (m *RepoMetadata) updateDetailedStats(repoPath, author string) {
 	since := time.Now().AddDate(0, 0, -30) // Only fetch last 30 days for detailed stats
-	// fmt.Printf("Debug - Fetching detailed commit info for %s since %v\n", repoPath, since)
 	
+	// Fetch commit history
 	if history, err := fetchDetailedCommitInfo(repoPath, author, since); err == nil {
 		m.CommitHistory = history
-		// fmt.Printf("Debug - Successfully fetched %d commits\n", len(history))
 	} else {
 		fmt.Printf("Error collecting detailed stats for %s: %v\n", repoPath, err)
+	}
+
+	// Fetch language statistics
+	if languages, err := fetchLanguageStats(repoPath); err == nil {
+		m.Languages = languages
+		
+		// Calculate total lines across all languages
+		totalLines := 0
+		for _, lines := range languages {
+			totalLines += lines
+		}
+		m.TotalLines = totalLines
+	} else {
+		fmt.Printf("Error collecting language stats for %s: %v\n", repoPath, err)
 	}
 }
 
@@ -327,20 +340,43 @@ func fetchLanguageStats(repoPath string) (map[string]int, error) {
 	cmd := exec.Command("git", "-C", repoPath, "ls-files")
 	output, err := cmd.Output()
 	if err != nil {
-		return languages, err
+		return languages, fmt.Errorf("git ls-files failed: %v", err)
 	}
 	
 	files := strings.Split(string(output), "\n")
 	for _, file := range files {
+		if file == "" {
+			continue
+		}
+		
 		if ext := filepath.Ext(file); ext != "" {
+			// Skip excluded extensions
+			if isExcludedExtension(ext) {
+				continue
+			}
+			
 			// Count lines in file
-			if lines, err := countFileLines(filepath.Join(repoPath, file)); err == nil {
-				languages[ext] += lines
+			fullPath := filepath.Join(repoPath, file)
+			if lines, err := countFileLines(fullPath); err == nil {
+				// Only add if it meets the minimum lines threshold
+				if lines >= config.AppConfig.LanguageSettings.MinimumLines {
+					languages[ext] += lines
+				}
 			}
 		}
 	}
 	
 	return languages, nil
+}
+
+// Helper function to check if an extension is excluded
+func isExcludedExtension(ext string) bool {
+	for _, excluded := range config.AppConfig.LanguageSettings.ExcludedExtensions {
+		if strings.EqualFold(ext, excluded) {
+			return true
+		}
+	}
+	return false
 }
 
 // Helper function to count lines in a file
@@ -371,13 +407,18 @@ func (m *RepoMetadata) GetLanguageDistribution() map[string]float64 {
     total := 0
     dist := make(map[string]float64)
     
-    for _, lines := range m.Languages {
-        total += lines
+    // Calculate total excluding unwanted languages
+    for lang, lines := range m.Languages {
+        if !isExcludedExtension(lang) {
+            total += lines
+        }
     }
     
     if total > 0 {
         for lang, lines := range m.Languages {
-            dist[lang] = float64(lines) / float64(total) * 100
+            if !isExcludedExtension(lang) {
+                dist[lang] = float64(lines) / float64(total) * 100
+            }
         }
     }
     
