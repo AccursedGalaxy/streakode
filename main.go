@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/AccursedGalaxy/streakode/cache"
@@ -154,9 +155,44 @@ func main() {
 		},
 	}
 
+	authorCmd := &cobra.Command{
+		Use:   "author",
+		Short: "Show configured Git author information",
+		Run: func(cmd *cobra.Command, args []string) {
+			// Check global git config
+			globalName, _ := exec.Command("git", "config", "--global", "user.name").Output()
+			globalEmail, _ := exec.Command("git", "config", "--global", "user.email").Output()
+			
+			fmt.Println("Global Git Configuration:")
+			fmt.Printf("Name:  %s", string(globalName))
+			fmt.Printf("Email: %s", string(globalEmail))
+			
+			// Check local git config if in a repository
+			if isGitRepo, _ := exec.Command("git", "rev-parse", "--is-inside-work-tree").Output(); len(isGitRepo) > 0 {
+				localName, _ := exec.Command("git", "config", "user.name").Output()
+				localEmail, _ := exec.Command("git", "config", "user.email").Output()
+				
+				if len(localName) > 0 || len(localEmail) > 0 {
+					fmt.Println("\nLocal Repository Configuration:")
+					if len(localName) > 0 {
+						fmt.Printf("Name:  %s", string(localName))
+					}
+					if len(localEmail) > 0 {
+						fmt.Printf("Email: %s", string(localEmail))
+					}
+				}
+			}
+			
+			// Show current streakode config
+			fmt.Printf("\nCurrent Streakode Configuration:\n")
+			fmt.Printf("Author: %s\n", config.AppConfig.Author)
+		},
+	}
+
 	rootCmd.AddCommand(statsCmd)
 	rootCmd.AddCommand(refreshCmd)
 	rootCmd.AddCommand(profileCmd)
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(authorCmd)
 	rootCmd.Execute()
 }

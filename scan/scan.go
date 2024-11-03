@@ -29,34 +29,60 @@ type RepoMetadata struct {
 func fetchRepoMeta(repoPath, author string) RepoMetadata {
 	meta := RepoMetadata{Path: repoPath}
 	
-	// Get commits with date only
-	authorCmd := exec.Command("git", "-C", repoPath, "log", "--all", "--pretty=format:%ci")
-	output, err := authorCmd.Output()
-	if err != nil {
-		fmt.Printf("Error getting git log for %s: %v\n", repoPath, err)
-		return meta
+	// First, let's get the configured Git user info for this repo
+	configCmd := exec.Command("git", "-C", repoPath, "config", "--get-regexp", "^user\\.(name|email)$")
+	configOutput, _ := configCmd.Output()
+	
+	// Build a list of possible author patterns
+	authorPatterns := []string{
+		author,                         // Exact match
+		fmt.Sprintf("%s <.*>", author), // Name with any email
 	}
-
-	if len(output) > 0 {
-		meta.AuthorVerified = true
-		dates := strings.Split(string(output), "\n")
-		meta.CommitCount = len(dates)
-		
-		// Get both current and longest streaks
-		streakInfo := calculateStreakInfo(dates)
-		meta.CurrentStreak = streakInfo.Current
-		meta.LongestStreak = streakInfo.Longest
-		
-		// Parse first date for last commit
-		if lastCommitTime, err := time.Parse("2006-01-02 15:04:05 -0700", dates[0]); err == nil {
-			meta.LastCommit = lastCommitTime
+	
+	// Add configured git user if available
+	if len(configOutput) > 0 {
+		lines := strings.Split(string(configOutput), "\n")
+		var userName, userEmail string
+		for _, line := range lines {
+			if strings.HasPrefix(line, "user.name ") {
+				userName = strings.TrimPrefix(line, "user.name ")
+			} else if strings.HasPrefix(line, "user.email ") {
+				userEmail = strings.TrimPrefix(line, "user.email ")
+			}
 		}
-		
-		meta.WeeklyCommits = countRecentCommits(dates, 7)
-		meta.MonthlyCommits = countRecentCommits(dates, 30)
-		meta.MostActiveDay = findMostActiveDay(dates)
-
-		meta.Dormant = time.Since(meta.LastCommit) > time.Duration(config.AppConfig.DormantThreshold) * 24 * time.Hour
+		if userName != "" && userEmail != "" {
+			authorPatterns = append(authorPatterns, 
+				fmt.Sprintf("%s <%s>", userName, userEmail))
+		}
+	}
+	
+	// Try each author pattern
+	for _, pattern := range authorPatterns {
+		authorCmd := exec.Command("git", "-C", repoPath, "log", "--all", 
+			"--author="+pattern, "--pretty=format:%ci")
+		output, err := authorCmd.Output()
+		if err == nil && len(output) > 0 {
+			meta.AuthorVerified = true
+			dates := strings.Split(string(output), "\n")
+			meta.CommitCount = len(dates)
+			
+			// Get both current and longest streaks
+			streakInfo := calculateStreakInfo(dates)
+			meta.CurrentStreak = streakInfo.Current
+			meta.LongestStreak = streakInfo.Longest
+			
+			// Parse first date for last commit
+			if lastCommitTime, err := time.Parse("2006-01-02 15:04:05 -0700", dates[0]); err == nil {
+				meta.LastCommit = lastCommitTime
+			}
+			
+			meta.WeeklyCommits = countRecentCommits(dates, 7)
+			meta.MonthlyCommits = countRecentCommits(dates, 30)
+			meta.MostActiveDay = findMostActiveDay(dates)
+			meta.Dormant = time.Since(meta.LastCommit) > time.Duration(config.AppConfig.DormantThreshold) * 24 * time.Hour
+			
+			break // We found matching commits, no need to try other patterns
+		}
 	}
 
 	return meta
