@@ -108,20 +108,6 @@ streakode profile -       # Switch to default profile
 streakode stats --profile work
 ```
 
-# Future Commands
-```bash
-# Manage Goals
-streakode goals # Set of commands to manage different goals -> goals are not yet implemented
-
-# Validate Configuration Files
-streakode validate_config --profile work # Validate work profile configuration
-
-streakode update # Update Streakode to the latest version
-
-# Uninstall Streakode
-streakode uninstall
-```
-
 ## Updating 🔄
 
 Logic for updating is currently not implemented.
@@ -195,6 +181,43 @@ go mod download
 # Build and install locally
 make dev
 ```
+
+### Next To Implement 🚀
+
+#### 1. Enhanced Historical Data Collection 📊
+
+We're expanding our data collection capabilities to provide deeper insights into coding patterns and productivity trends.
+
+**Key Improvements:**
+- Track commit metadata historically for advanced analytics
+- Analyze peak coding hours and most productive days
+- Monitor velocity changes over time
+
+**Implementation Details:**
+1. Extend `RepoMetadata` structure:
+   - Add arrays for daily/hourly commit tracking
+   - Enable timestamp-based commit analysis
+   - Store historical snapshots to minimize repository rescanning
+
+2. Velocity Trend Analysis:
+   - Calculate daily commit velocity (7/30 day averages)
+   - Compare current vs historical velocities
+   - Store metrics in new `DailyCommitData` structure
+
+#### 2. Goal Tracking & Progress Visualization 🎯
+
+Enhance the user experience with visual progress tracking and goal management.
+
+**Planned Features:**
+- ASCII progress bars for weekly/monthly goals
+- Percentage-based completion indicators
+- Integration with user-defined goals from config
+- Real-time progress tracking against set targets
+
+#### 3. Enhanced Profile Management 👤
+
+Streamline profile management with new CLI commands:
+
 
 ## License 📄
 
