@@ -121,6 +121,7 @@ func main() {
 				os.Exit(1)
 			}
 			
+      // Validate the config
 			if err := newConfig.ValidateConfig(); err != nil {
 				fmt.Printf("Error: Invalid configuration for profile '%s': %v\n", newProfile, err)
 				os.Exit(1)
