@@ -20,6 +20,8 @@ type repoInfo struct {
     lastCommit time.Time
 }
 
+// TODO: I think emojis are casuing the table to might get dispalyed wrongly on different devices/terminals - since emoji width might be different.
+
 // DisplayStats - Displays stats for all active repositories in a more compact format
 func DisplayStats() {
 	// Create a test table to calculate width

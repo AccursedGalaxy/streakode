@@ -67,6 +67,8 @@ type RepoMetadata struct {
 
 }
 
+// TODO: allow users to setup direcotires or files to exclude frm the scan via config
+
 // fetchRepoMeta - gets metadata for a single repository and verifies user
 func fetchRepoMeta(repoPath, author string) RepoMetadata {
 	meta := RepoMetadata{
