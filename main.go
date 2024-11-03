@@ -43,8 +43,14 @@ func main() {
 		Short: "A Git activity tracker for monitoring coding streaks",
 			Version: Version,
 			PersistentPreRun: func(cmd *cobra.Command, args []string) {
-				cacheFilePath := getCacheFilePath(profile)
-				config.LoadConfig(profile)
+				// Load the state first to get the active profile
+				if err := config.LoadState(); err != nil {
+					fmt.Printf("Error loading state: %v\n", err)
+				}
+				
+				// Use AppState.ActiveProfile instead of the profile flag
+				cacheFilePath := getCacheFilePath(config.AppState.ActiveProfile)
+				config.LoadConfig(config.AppState.ActiveProfile)
 				cache.InitCache()
 				if err := cache.LoadCache(cacheFilePath); err != nil {
 					fmt.Printf("Error loading cache: %v\n", err)
