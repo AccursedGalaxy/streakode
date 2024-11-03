@@ -103,6 +103,20 @@ streakode profile -       # Switch to default profile
 streakode stats --profile work
 ```
 
+# Future Commands
+```bash
+# Manage Goals
+streakode goals # Set of commands to manage different goals -> goals are not yet implemented
+
+# Validate Configuration Files
+streakode validate_config --profile work # Validate work profile configuration
+
+streakode update # Update Streakode to the latest version
+
+# Uninstall Streakode
+streakode uninstall
+```
+
 ## Updating 🔄
 
 Logic for updating is currently not implemented.
