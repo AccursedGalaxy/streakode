@@ -126,6 +126,8 @@ type StreakInfo struct {
 	Longest int
 }
 
+// TODO: Go through this streak calculation again to make sure it works as intended
+// TODO: Make sure commits are sorted by date before Streak calculation
 func calculateStreakInfo(dates []string) StreakInfo {
 	if len(dates) == 0 {
 		return StreakInfo{0, 0}
@@ -135,7 +137,8 @@ func calculateStreakInfo(dates []string) StreakInfo {
 	currentStreak := 1
 	longestStreak := 1
 	lastDate, _ := time.Parse("2006-01-02 15:04:05 -0700", dates[0])
-	
+
+  // TODO: implement better timezone managemtn here instaed of using 1.5
 	// If last commit wasn't today or yesterday, current streak should be 0
 	daysSinceLastCommit := time.Since(lastDate).Hours() / 24
 	if daysSinceLastCommit > 1.5 { // Using 1.5 to account for timezone differences
