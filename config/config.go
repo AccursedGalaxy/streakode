@@ -33,6 +33,7 @@ type Config struct {
 		SectionColor string `mapstructure:"section_color"`
 		DividerColor string `mapstructure:"divider_color"`
 	}
+	DetailedStats bool `mapstructure:"detailed_stats" yaml:"detailed_stats"`
 }
 
 type State struct {

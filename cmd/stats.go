@@ -100,15 +100,17 @@ func hasAnyStatsEnabled() bool {
 }
 
 func buildStatsSection() string {
+	// Use pre-computed values from cache
 	weeklyTotal := 0
 	monthlyTotal := 0
 	totalCommits := 0
 	
-	// Sum up the commits from each repo in the cache
 	for _, repo := range cache.Cache {
-		weeklyTotal += repo.WeeklyCommits
-		monthlyTotal += repo.MonthlyCommits
-		totalCommits += repo.CommitCount
+		if !repo.Dormant {
+			weeklyTotal += repo.WeeklyCommits
+			monthlyTotal += repo.MonthlyCommits
+			totalCommits += repo.CommitCount
+		}
 	}
 	
 	stats := []string{}
@@ -182,6 +184,21 @@ func buildProjectsSection() string {
 			summary += fmt.Sprintf(" • 🔥 %d day streak", repo.metadata.CurrentStreak)
 		}
 
+		// Add detailed stats if enabled
+		if config.AppConfig.DetailedStats && len(repo.metadata.CommitHistory) > 0 {
+			// Calculate lines changed in the last week
+			var additions, deletions int
+			for _, commit := range repo.metadata.CommitHistory {
+				if time.Since(commit.Date) <= 7*24*time.Hour {
+					additions += commit.Additions
+					deletions += commit.Deletions
+				}
+			}
+			if additions > 0 || deletions > 0 {
+				summary += fmt.Sprintf(" • +%d/-%d lines", additions, deletions)
+			}
+		}
+
 		daysAgo := time.Since(repo.lastCommit).Hours() / 24
 		if daysAgo < 1 {
 			summary += " • today"
@@ -198,23 +215,48 @@ func buildProjectsSection() string {
 }
 
 func buildInsightsSection() string {
+	if !config.AppConfig.DisplayStats.ShowInsights {
+		return ""
+	}
+
+	var insights []string
+	
+	// Basic insights (always shown)
 	highestStreak := 0
 	var streakChampRepo string
 	
 	for path, repo := range cache.Cache {
-		if repo.CurrentStreak > highestStreak {
+		if !repo.Dormant && repo.CurrentStreak > highestStreak {
 			highestStreak = repo.CurrentStreak
 			streakChampRepo = path
 		}
 	}
 	
-	if streakChampRepo == "" || highestStreak == 0 {
-		return ""
+	if streakChampRepo != "" && highestStreak > 0 {
+		insights = append(insights, fmt.Sprintf("💫 %s is your most active project with a %d day streak!",
+			streakChampRepo[strings.LastIndex(streakChampRepo, "/")+1:],
+			highestStreak))
+	}
+
+	// Detailed insights (only when detailed_stats is enabled)
+	if config.AppConfig.DetailedStats {
+		var totalAdditions, totalDeletions int
+		for _, repo := range cache.Cache {
+			for _, commit := range repo.CommitHistory {
+				if time.Since(commit.Date) <= 7*24*time.Hour {
+					totalAdditions += commit.Additions
+					totalDeletions += commit.Deletions
+				}
+			}
+		}
+		
+		if totalAdditions > 0 || totalDeletions > 0 {
+			insights = append(insights, fmt.Sprintf("📝 This week: %d lines added, %d removed", 
+				totalAdditions, totalDeletions))
+		}
 	}
 	
-	return fmt.Sprintf("💫 %s is your most active project with a %d day streak!",
-		streakChampRepo[strings.LastIndex(streakChampRepo, "/")+1:],
-		highestStreak)
+	return strings.Join(insights, "\n")
 }
 
 func min(a, b int) int {

@@ -71,133 +71,60 @@ type RepoMetadata struct {
 func fetchRepoMeta(repoPath, author string) RepoMetadata {
 	meta := RepoMetadata{
 		Path:         repoPath,
-		DailyStats:   make(map[string]DailyStats),
-		Languages:    make(map[string]int),
-		Contributors: make(map[string]int),
 		LastAnalyzed: time.Now(),
 	}
 	
-	// First, let's get the configured Git user info for this repo
-	configCmd := exec.Command("git", "-C", repoPath, "config", "--get-regexp", "^user\\.(name|email)$")
-	configOutput, _ := configCmd.Output()
-	
-	// Build a list of possible author patterns
-	authorPatterns := []string{
-		author,                         // Exact match
-		fmt.Sprintf("%s <.*>", author), // Name with any email
-	}
-	
-	// Add configured git user if available
-	if len(configOutput) > 0 {
-		lines := strings.Split(string(configOutput), "\n")
-		var userName, userEmail string
-		for _, line := range lines {
-			if strings.HasPrefix(line, "user.name ") {
-				userName = strings.TrimPrefix(line, "user.name ")
-			} else if strings.HasPrefix(line, "user.email ") {
-				userEmail = strings.TrimPrefix(line, "user.email ")
-			}
+	// Get commit dates in a single git command
+	authorCmd := exec.Command("git", "-C", repoPath, "log", "--all", 
+		"--author="+author, "--pretty=format:%ci")
+	output, err := authorCmd.Output()
+	if err == nil && len(output) > 0 {
+		meta.AuthorVerified = true
+		dates := strings.Split(string(output), "\n")
+		meta.CommitCount = len(dates)
+		
+		// Parse first date for last commit
+		if lastCommitTime, err := time.Parse("2006-01-02 15:04:05 -0700", dates[0]); err == nil {
+			meta.LastCommit = lastCommitTime
+			meta.Dormant = time.Since(meta.LastCommit) > time.Duration(config.AppConfig.DormantThreshold) * 24 * time.Hour
 		}
-		if userName != "" && userEmail != "" {
-			authorPatterns = append(authorPatterns, 
-				fmt.Sprintf("%s <%s>", userName, userEmail))
-		}
-	}
-	
-	// Try each author pattern
-	for _, pattern := range authorPatterns {
-		authorCmd := exec.Command("git", "-C", repoPath, "log", "--all", 
-			"--author="+pattern, "--pretty=format:%ci")
-		output, err := authorCmd.Output()
-		if err == nil && len(output) > 0 {
-			meta.AuthorVerified = true
-			dates := strings.Split(string(output), "\n")
-			meta.CommitCount = len(dates)
-			
-			// Get both current and longest streaks
+		
+		// Quick stats that we always need
+		meta.WeeklyCommits = countRecentCommits(dates, 7)
+		meta.MonthlyCommits = countRecentCommits(dates, 30)
+		
+		// Only compute streak info if the repo is active
+		if !meta.Dormant {
 			streakInfo := calculateStreakInfo(dates)
 			meta.CurrentStreak = streakInfo.Current
 			meta.LongestStreak = streakInfo.Longest
-			
-			// Parse first date for last commit
-			if lastCommitTime, err := time.Parse("2006-01-02 15:04:05 -0700", dates[0]); err == nil {
-				meta.LastCommit = lastCommitTime
-			}
-			
-			meta.WeeklyCommits = countRecentCommits(dates, 7)
-			meta.MonthlyCommits = countRecentCommits(dates, 30)
 			meta.MostActiveDay = findMostActiveDay(dates)
-			meta.Dormant = time.Since(meta.LastCommit) > time.Duration(config.AppConfig.DormantThreshold) * 24 * time.Hour
-			
-			// Fetch detailed commit history (last 365 days by default)
-			since := time.Now().AddDate(-1, 0, 0)
-			if history, err := fetchDetailedCommitInfo(repoPath, author, since); err == nil {
-				meta.CommitHistory = history
-				
-				// Aggregate daily stats
-				for _, commit := range history {
-					dateStr := commit.Date.Format("2006-01-02")
-					stats := meta.DailyStats[dateStr]
-					stats.Date, _ = time.Parse("2006-01-02", dateStr)
-					stats.Commits++
-					stats.Lines += commit.Additions - commit.Deletions
-					stats.Files += commit.FileCount
-					meta.DailyStats[dateStr] = stats
-				}
-			}
-			
-			// Fetch language statistics
-			if langs, err := fetchLanguageStats(repoPath); err == nil {
-				meta.Languages = langs
-			}
+		}
 
-			// Calculate Velocity
-			velocity := meta.CalculateVelocity()
-
-			// Debug Printing for entire infrmatoin fetched for testing
-			
-			fmt.Printf("\n=== Debug Info for Repository: %s ===\n", repoPath)
-			fmt.Printf("Author Verified: %v\n", meta.AuthorVerified)
-			fmt.Printf("Commit Count: %d\n", meta.CommitCount)
-			fmt.Printf("Current Streak: %d days\n", meta.CurrentStreak)
-			fmt.Printf("Longest Streak: %d days\n", meta.LongestStreak)
-			fmt.Printf("Last Commit: %v\n", meta.LastCommit)
-			fmt.Printf("Weekly Commits: %d\n", meta.WeeklyCommits)
-			fmt.Printf("Monthly Commits: %d\n", meta.MonthlyCommits)
-			fmt.Printf("Most Active Day: %s\n", meta.MostActiveDay)
-			fmt.Printf("Dormant: %v\n", meta.Dormant)
-
-			fmt.Printf("\nLanguage Distribution:\n")
-			for lang, lines := range meta.Languages {
-				fmt.Printf("  %s: %d lines\n", lang, lines)
-			}
-			
-			fmt.Printf("\nDaily Stats (Last 7 Days):\n")
-			now := time.Now()
-			for i := 0; i < 7; i++ {
-				date := now.AddDate(0, 0, -i).Format("2006-01-02")
-				if stats, ok := meta.DailyStats[date]; ok {
-					fmt.Printf("  %s: %d commits, %d lines, %d files\n", 
-						date, stats.Commits, stats.Lines, stats.Files)
-				}
-			}
-
-			fmt.Printf("\n")
-			fmt.Printf("Daily Average: %.2f commits\n", velocity.DailyAverage)
-			fmt.Printf("Weekly Trend: %.1f%%\n", velocity.WeeklyTrend)
-			fmt.Printf("Monthly Trend: %.1f%%\n", velocity.MonthlyTrend)
-			
-			fmt.Println("\nPeak Coding Hours:")
-			for _, peak := range velocity.PeakHours {
-				fmt.Printf("%02d:00 - %d commits (%d lines)\n", 
-					peak.Hour, peak.Commits, peak.Lines)
-			}
-			
-			break // We found matching commits, no need to try other patterns
+		// Only compute detailed stats if explicitly configured
+		if config.AppConfig.DetailedStats {
+			meta.initDetailedStats()
+			meta.updateDetailedStats(repoPath, author)
 		}
 	}
 
 	return meta
+}
+
+// Initialize maps only when needed
+func (m *RepoMetadata) initDetailedStats() {
+	m.DailyStats = make(map[string]DailyStats)
+	m.Languages = make(map[string]int)
+	m.Contributors = make(map[string]int)
+}
+
+func (m *RepoMetadata) updateDetailedStats(repoPath, author string) {
+	since := time.Now().AddDate(0, 0, -30) // Only fetch last 30 days for detailed stats
+	if history, err := fetchDetailedCommitInfo(repoPath, author, since); err == nil {
+		m.CommitHistory = history
+	} else {
+		fmt.Printf("Error collecting detailed stats: %v", err)
+	}
 }
 
 func fetchDetailedCommitInfo(repoPath string, author string, since time.Time) ([]CommitHistory, error) {
