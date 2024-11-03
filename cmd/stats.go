@@ -121,12 +121,12 @@ func buildProjectsSection() string {
 	// Convert map to slice for sorting
 	repos := make([]repoInfo, 0, len(cache.Cache))
 	for path, repo := range cache.Cache {
-			repoName := path[strings.LastIndex(path, "/")+1:]
-			repos = append(repos, repoInfo{
-				name:       repoName,
-				metadata:   repo,
-				lastCommit: repo.LastCommit,
-			})
+		repoName := path[strings.LastIndex(path, "/")+1:]
+		repos = append(repos, repoInfo{
+			name:       repoName,
+			metadata:   repo,
+			lastCommit: repo.LastCommit,
+		})
 	}
 
 	// Sort by most recent activity
@@ -134,111 +134,85 @@ func buildProjectsSection() string {
 		return repos[i].lastCommit.After(repos[j].lastCommit)
 	})
 
-	if config.AppConfig.DetailedStats {
-		// Create buffer for table
-		buf := new(bytes.Buffer)
-		table := tablewriter.NewWriter(buf)
+	// Create buffer for table
+	buf := new(bytes.Buffer)
+	table := tablewriter.NewWriter(buf)
 
-		// Configure table style
-		table.SetHeader([]string{"Repository", "Weekly", "Streak", "Changes", "Activity"})
-		table.SetBorder(false)
-		table.SetColumnSeparator("│")
-		table.SetCenterSeparator("┼")
-		table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-		table.SetAlignment(tablewriter.ALIGN_LEFT)
-		table.SetHeaderLine(true)
-		table.SetRowLine(false)
-		
-		// Set minimum column widths
-		table.SetColMinWidth(0, 20)  // Repository
-		table.SetColMinWidth(1, 8)   // Weekly
-		table.SetColMinWidth(2, 8)   // Streak
-		table.SetColMinWidth(3, 13)  // Changes
-		table.SetColMinWidth(4, 10)  // Activity
-		
-		table.SetColumnAlignment([]int{
-			tablewriter.ALIGN_LEFT,
-			tablewriter.ALIGN_RIGHT,
-			tablewriter.ALIGN_CENTER,
-			tablewriter.ALIGN_RIGHT,
-			tablewriter.ALIGN_LEFT,
-		})
+	// Configure table style
+	table.SetHeader([]string{"Repository", "Weekly", "Streak", "Changes", "Activity"})
+	table.SetBorder(false)
+	table.SetColumnSeparator("│")
+	table.SetCenterSeparator("┼")
+	table.SetHeaderAlignment(tablewriter.ALIGN_CENTER)
+	table.SetAlignment(tablewriter.ALIGN_CENTER)
+	table.SetHeaderLine(true)
+	table.SetRowLine(false)
+	
+	// Set minimum column widths
+	table.SetColMinWidth(0, 20)  // Repository
+	table.SetColMinWidth(1, 8)   // Weekly
+	table.SetColMinWidth(2, 8)   // Streak
+	table.SetColMinWidth(3, 13)  // Changes
+	table.SetColMinWidth(4, 10)  // Activity
+	
+	// All columns centered
+	table.SetColumnAlignment([]int{
+		tablewriter.ALIGN_CENTER,
+		tablewriter.ALIGN_CENTER,
+		tablewriter.ALIGN_CENTER,
+		tablewriter.ALIGN_CENTER,
+		tablewriter.ALIGN_CENTER,
+	})
 
-		displayCount := min(len(repos), config.AppConfig.DisplayStats.MaxProjects)
-		for i := 0; i < displayCount; i++ {
-			repo := repos[i]
-			meta := repo.metadata
+	displayCount := min(len(repos), config.AppConfig.DisplayStats.MaxProjects)
+	for i := 0; i < displayCount; i++ {
+		repo := repos[i]
+		meta := repo.metadata
 
-			// Determine activity icon
-			activity := "⚡"
-			if meta.WeeklyCommits > 10 {
-				activity = "🔥"
-			} else if meta.WeeklyCommits == 0 {
-				activity = "💤"
+		// Determine activity icon
+		activity := "⚡"
+		if meta.WeeklyCommits > 10 {
+			activity = "🔥"
+		} else if meta.WeeklyCommits == 0 {
+			activity = "💤"
+		}
+
+		// Format streak
+		streakStr := fmt.Sprintf("%dd", meta.CurrentStreak)
+		if meta.CurrentStreak == meta.LongestStreak && meta.CurrentStreak > 0 {
+			streakStr += "🏆"
+		} else if meta.CurrentStreak > 0 {
+			streakStr += "🔥"
+		}
+
+		// Format activity
+		activityStr := "today"
+		if hours := time.Since(repo.lastCommit).Hours(); hours > 24 {
+			activityStr = fmt.Sprintf("%dd ago", int(hours/24))
+		}
+
+		// Calculate weekly changes (always use detailed format)
+		var weeklyAdditions, weeklyDeletions int
+		weekStart := time.Now().AddDate(0, 0, -7)
+		for _, commit := range meta.CommitHistory {
+			if commit.Date.After(weekStart) {
+				weeklyAdditions += commit.Additions
+				weeklyDeletions += commit.Deletions
 			}
+		}
+		changesStr := fmt.Sprintf("+%d/-%d", weeklyAdditions, weeklyDeletions)
 
-			// Calculate weekly changes
-			var weeklyAdditions, weeklyDeletions int
-			weekStart := time.Now().AddDate(0, 0, -7)
-			for _, commit := range meta.CommitHistory {
-				if commit.Date.After(weekStart) {
-					weeklyAdditions += commit.Additions
-					weeklyDeletions += commit.Deletions
-				}
-			}
-
-			// Format streak
-			streakStr := fmt.Sprintf("%dd", meta.CurrentStreak)
-			if meta.CurrentStreak == meta.LongestStreak && meta.CurrentStreak > 0 {
-				streakStr += "🏆"
-			} else if meta.CurrentStreak > 0 {
-				streakStr += "🔥"
-			}
-
-			// Format activity
-			activityStr := "today"
-			if hours := time.Since(repo.lastCommit).Hours(); hours > 24 {
-				activityStr = fmt.Sprintf("%dd ago", int(hours/24))
-			}
-
-			table.Append([]string{
-				fmt.Sprintf("%s %s", activity, repo.name),
-				fmt.Sprintf("%d↑", meta.WeeklyCommits),
+		table.Append([]string{
+			fmt.Sprintf("%s %s", activity, repo.name),
+			fmt.Sprintf("%d↑", meta.WeeklyCommits),
 				streakStr,
-				fmt.Sprintf("+%d/-%d", weeklyAdditions, weeklyDeletions),
+				changesStr,
 				activityStr,
-			})
-		}
-
-		table.Render()
-		return buf.String()
-	} else {
-		// Simple format for non-detailed view
-		var summaries []string
-		displayCount := min(len(repos), config.AppConfig.DisplayStats.MaxProjects)
-		for i := 0; i < displayCount; i++ {
-			repo := repos[i]
-			meta := repo.metadata
-			repoName := repo.name
-
-			// Determine activity icon
-			activity := "⚡"
-			if meta.WeeklyCommits > 10 {
-				activity = "🔥"
-			} else if meta.WeeklyCommits == 0 {
-				activity = "💤"
-			}
-
-			summary := fmt.Sprintf("  %s %s: %d↑ this week • 🔥 %dd",
-				activity,
-				repoName[:min(len(repoName), 15)],
-				meta.WeeklyCommits,
-				meta.CurrentStreak)
-			summaries = append(summaries, summary)
-		}
-
-		return strings.Join(summaries, "\n")
+		})
 	}
+
+	table.Render()
+	return buf.String()
 }
 
 func formatLanguages(stats map[string]int) string {
