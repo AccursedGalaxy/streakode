@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -26,6 +27,21 @@ type DailyStats struct {
 	Commits			int			`json:"commits"`
 	Lines			int			`json:"lines"`
 	Files			int			`json:"files"`
+}
+
+// TimeSlot represents a 24-hour time period divided into slots
+type TimeSlot struct {
+    Hour    int     `json:"hour"`
+    Commits int     `json:"commits"`
+    Lines   int     `json:"lines"`
+}
+
+// VelocityMetrics represents coding velocity over different time periods
+type VelocityMetrics struct {
+    DailyAverage   float64 `json:"daily_average"`
+    WeeklyTrend    float64 `json:"weekly_trend"`    // Percentage change from previous week
+    MonthlyTrend   float64 `json:"monthly_trend"`   // Percentage change from previous month
+    PeakHours      []TimeSlot `json:"peak_hours"`
 }
 
 type RepoMetadata struct {
@@ -135,9 +151,11 @@ func fetchRepoMeta(repoPath, author string) RepoMetadata {
 				meta.Languages = langs
 			}
 
+			// Calculate Velocity
+			velocity := meta.CalculateVelocity()
+
 			// Debug Printing for entire infrmatoin fetched for testing
 			
-			/*
 			fmt.Printf("\n=== Debug Info for Repository: %s ===\n", repoPath)
 			fmt.Printf("Author Verified: %v\n", meta.AuthorVerified)
 			fmt.Printf("Commit Count: %d\n", meta.CommitCount)
@@ -163,9 +181,17 @@ func fetchRepoMeta(repoPath, author string) RepoMetadata {
 						date, stats.Commits, stats.Lines, stats.Files)
 				}
 			}
-			fmt.Printf("\n" 
 
-			*/
+			fmt.Printf("\n")
+			fmt.Printf("Daily Average: %.2f commits\n", velocity.DailyAverage)
+			fmt.Printf("Weekly Trend: %.1f%%\n", velocity.WeeklyTrend)
+			fmt.Printf("Monthly Trend: %.1f%%\n", velocity.MonthlyTrend)
+			
+			fmt.Println("\nPeak Coding Hours:")
+			for _, peak := range velocity.PeakHours {
+				fmt.Printf("%02d:00 - %d commits (%d lines)\n", 
+					peak.Hour, peak.Commits, peak.Lines)
+			}
 			
 			break // We found matching commits, no need to try other patterns
 		}
@@ -422,4 +448,83 @@ func (m *RepoMetadata) GetLanguageDistribution() map[string]float64 {
     }
     
     return dist
+}
+
+func (m *RepoMetadata) CalculatePeakHours() []TimeSlot {
+    hourStats := make(map[int]*TimeSlot)
+    
+    // Initialize all hours
+    for i := 0; i < 24; i++ {
+        hourStats[i] = &TimeSlot{Hour: i}
+    }
+    
+    // Aggregate commit data by hour
+    for _, commit := range m.CommitHistory {
+        hour := commit.Date.Hour()
+        slot := hourStats[hour]
+        slot.Commits++
+        slot.Lines += commit.Additions + commit.Deletions
+    }
+    
+    // Convert to slice and sort by commit count
+    peaks := make([]TimeSlot, 0, 24)
+    for _, slot := range hourStats {
+        peaks = append(peaks, *slot)
+    }
+    
+    // Sort by commit count descending
+    sort.Slice(peaks, func(i, j int) bool {
+        return peaks[i].Commits > peaks[j].Commits
+    })
+    
+    // Return top 5 peak hours
+    if len(peaks) > 5 {
+        return peaks[:5]
+    }
+    return peaks
+}
+
+func (m *RepoMetadata) CalculateVelocity() VelocityMetrics {
+    now := time.Now()
+    metrics := VelocityMetrics{}
+    
+    // Calculate daily average (last 30 days)
+    thirtyDaysAgo := now.AddDate(0, 0, -30)
+    recentCommits := 0
+    for _, commit := range m.CommitHistory {
+        if commit.Date.After(thirtyDaysAgo) {
+            recentCommits++
+        }
+    }
+    metrics.DailyAverage = float64(recentCommits) / 30.0
+    
+    // Calculate weekly trend
+    currentWeek := countCommitsInPeriod(m.CommitHistory, now.AddDate(0, 0, -7), now)
+    previousWeek := countCommitsInPeriod(m.CommitHistory, now.AddDate(0, 0, -14), now.AddDate(0, 0, -7))
+    if previousWeek > 0 {
+        metrics.WeeklyTrend = (float64(currentWeek) - float64(previousWeek)) / float64(previousWeek) * 100
+    }
+    
+    // Calculate monthly trend
+    currentMonth := countCommitsInPeriod(m.CommitHistory, now.AddDate(0, -1, 0), now)
+    previousMonth := countCommitsInPeriod(m.CommitHistory, now.AddDate(0, -2, 0), now.AddDate(0, -1, 0))
+    if previousMonth > 0 {
+        metrics.MonthlyTrend = (float64(currentMonth) - float64(previousMonth)) / float64(previousMonth) * 100
+    }
+    
+    // Calculate peak hours
+    metrics.PeakHours = m.CalculatePeakHours()
+    
+    return metrics
+}
+
+// Helper function to count commits in a time period
+func countCommitsInPeriod(history []CommitHistory, start, end time.Time) int {
+    count := 0
+    for _, commit := range history {
+        if commit.Date.After(start) && commit.Date.Before(end) {
+            count++
+        }
+    }
+    return count
 }
