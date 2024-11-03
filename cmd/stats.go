@@ -30,6 +30,16 @@ func DisplayStats() {
 		}
 	}
 
+
+	// TODO: Actually create more comprehensive stats and insights.
+	// TODO: Implement goal tracking and achievemetns
+	// TODO: Actual motivation
+
+
+	// TODO: Better Output depending on config/profile && more clean lookig output.
+	// -> currently the (line breaks) we have setup are displayed regardless.
+	// -> need to think of a way to dynamically genearte nice compact reports regardless of what user has enabled/disabled
+
 	// Always show header, as it provides context
 	fmt.Printf("🚀 %s's Coding Activity\n", config.AppConfig.Author)
 	fmt.Printf("──────────────────────────────────────\n")
