@@ -5,11 +5,28 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/AccursedGalaxy/streakode/config"
 )
+
+type CommitHistory struct {
+	Date			time.Time	`json:"date"`
+	Hash			string		`json:"hash"`
+	MessageHead		string		`json:"message_head"`
+	FileCount		int			`json:"file_count"`
+	Additions		int			`json:"additions"`
+	Deletions		int			`json:"deletions"`
+}
+
+type DailyStats struct {
+	Date			time.Time	`json:"date"`
+	Commits			int			`json:"commits"`
+	Lines			int			`json:"lines"`
+	Files			int			`json:"files"`
+}
 
 type RepoMetadata struct {
 	Path           string    `json:"path"`
@@ -23,11 +40,26 @@ type RepoMetadata struct {
 	LastActivity   string    `json:"last_activity"`
 	AuthorVerified bool      `json:"author_verified"`
 	Dormant        bool      `json:"dormant"`
+
+	CommitHistory	[]CommitHistory 		`json:"commit_history"`
+	DailyStats		map[string]DailyStats  	`json:"daily_stats"`
+	LastAnalyzed	time.Time  				`json:"last_analyzed"`
+	TotalLines		int 					`json:"total_lines"`
+	TotalFiles 		int 					`json:"total_files"`
+	Languages  		map[string]int 			`json:"languages"`
+	Contributors	map[string]int 			`json:"contributors"`
+
 }
 
 // fetchRepoMeta - gets metadata for a single repository and verifies user
 func fetchRepoMeta(repoPath, author string) RepoMetadata {
-	meta := RepoMetadata{Path: repoPath}
+	meta := RepoMetadata{
+		Path:         repoPath,
+		DailyStats:   make(map[string]DailyStats),
+		Languages:    make(map[string]int),
+		Contributors: make(map[string]int),
+		LastAnalyzed: time.Now(),
+	}
 	
 	// First, let's get the configured Git user info for this repo
 	configCmd := exec.Command("git", "-C", repoPath, "config", "--get-regexp", "^user\\.(name|email)$")
@@ -81,11 +113,118 @@ func fetchRepoMeta(repoPath, author string) RepoMetadata {
 			meta.MostActiveDay = findMostActiveDay(dates)
 			meta.Dormant = time.Since(meta.LastCommit) > time.Duration(config.AppConfig.DormantThreshold) * 24 * time.Hour
 			
+			// Fetch detailed commit history (last 365 days by default)
+			since := time.Now().AddDate(-1, 0, 0)
+			if history, err := fetchDetailedCommitInfo(repoPath, author, since); err == nil {
+				meta.CommitHistory = history
+				
+				// Aggregate daily stats
+				for _, commit := range history {
+					dateStr := commit.Date.Format("2006-01-02")
+					stats := meta.DailyStats[dateStr]
+					stats.Date, _ = time.Parse("2006-01-02", dateStr)
+					stats.Commits++
+					stats.Lines += commit.Additions - commit.Deletions
+					stats.Files += commit.FileCount
+					meta.DailyStats[dateStr] = stats
+				}
+			}
+			
+			// Fetch language statistics
+			if langs, err := fetchLanguageStats(repoPath); err == nil {
+				meta.Languages = langs
+			}
+
+			// Debug Printing for entire infrmatoin fetched for testing
+			/*
+			fmt.Printf("\n=== Debug Info for Repository: %s ===\n", repoPath)
+			fmt.Printf("Author Verified: %v\n", meta.AuthorVerified)
+			fmt.Printf("Commit Count: %d\n", meta.CommitCount)
+			fmt.Printf("Current Streak: %d days\n", meta.CurrentStreak)
+			fmt.Printf("Longest Streak: %d days\n", meta.LongestStreak)
+			fmt.Printf("Last Commit: %v\n", meta.LastCommit)
+			fmt.Printf("Weekly Commits: %d\n", meta.WeeklyCommits)
+			fmt.Printf("Monthly Commits: %d\n", meta.MonthlyCommits)
+			fmt.Printf("Most Active Day: %s\n", meta.MostActiveDay)
+			fmt.Printf("Dormant: %v\n", meta.Dormant)
+
+			fmt.Printf("\nLanguage Distribution:\n")
+			for lang, lines := range meta.Languages {
+				fmt.Printf("  %s: %d lines\n", lang, lines)
+			}
+			
+			fmt.Printf("\nDaily Stats (Last 7 Days):\n")
+			now := time.Now()
+			for i := 0; i < 7; i++ {
+				date := now.AddDate(0, 0, -i).Format("2006-01-02")
+				if stats, ok := meta.DailyStats[date]; ok {
+					fmt.Printf("  %s: %d commits, %d lines, %d files\n", 
+						date, stats.Commits, stats.Lines, stats.Files)
+				}
+			}
+			fmt.Printf("\n" */)
+			
 			break // We found matching commits, no need to try other patterns
 		}
 	}
 
 	return meta
+}
+
+func fetchDetailedCommitInfo(repoPath string, author string, since time.Time) ([]CommitHistory, error) {
+    var history []CommitHistory
+    
+    // Get detailed git log with stats
+    cmd := exec.Command("git", "-C", repoPath, "log",
+        "--all",
+        "--author="+author,
+        "--pretty=format:%H|%aI|%s",
+        "--numstat",
+        "--after="+since.Format("2006-01-02"))
+    
+    output, err := cmd.Output()
+    if err != nil {
+        return nil, err
+    }
+
+    // Parse the git log output
+    lines := strings.Split(string(output), "\n")
+    var currentCommit *CommitHistory
+    
+    for _, line := range lines {
+        if strings.Contains(line, "|") {
+            // This is a commit header line
+            parts := strings.Split(line, "|")
+            if len(parts) == 3 {
+                if currentCommit != nil {
+                    history = append(history, *currentCommit)
+                }
+                
+                commitTime, _ := time.Parse(time.RFC3339, parts[1])
+                currentCommit = &CommitHistory{
+                    Hash:        parts[0],
+                    Date:        commitTime,
+                    MessageHead: parts[2],
+                }
+            }
+        } else if line != "" && currentCommit != nil {
+            // This is a stats line
+            parts := strings.Fields(line)
+            if len(parts) == 3 {
+                additions, _ := strconv.Atoi(parts[0])
+                deletions, _ := strconv.Atoi(parts[1])
+                currentCommit.Additions += additions
+                currentCommit.Deletions += deletions
+                currentCommit.FileCount++
+            }
+        }
+    }
+    
+    if currentCommit != nil {
+        history = append(history, *currentCommit)
+    }
+    
+    return history, nil
 }
 
 // ScanDirectories - scans for Git repositories in the specified directories
@@ -216,4 +355,68 @@ func findMostActiveDay(dates []string) string {
 		}
 	}
 	return maxDay
+}
+
+func fetchLanguageStats(repoPath string) (map[string]int, error) {
+	languages := make(map[string]int)
+	
+	// Use git ls-files to get all tracked files
+	cmd := exec.Command("git", "-C", repoPath, "ls-files")
+	output, err := cmd.Output()
+	if err != nil {
+		return languages, err
+	}
+	
+	files := strings.Split(string(output), "\n")
+	for _, file := range files {
+		if ext := filepath.Ext(file); ext != "" {
+			// Count lines in file
+			if lines, err := countFileLines(filepath.Join(repoPath, file)); err == nil {
+				languages[ext] += lines
+			}
+		}
+	}
+	
+	return languages, nil
+}
+
+// Helper function to count lines in a file
+func countFileLines(filePath string) (int, error) {
+    content, err := os.ReadFile(filePath)
+    if err != nil {
+        return 0, err
+    }
+    return len(strings.Split(string(content), "\n")), nil
+}
+
+// Add these utility functions to analyze the enhanced data
+
+func (m *RepoMetadata) GetCommitTrend(days int) map[string]int {
+    trend := make(map[string]int)
+    since := time.Now().AddDate(0, 0, -days)
+    
+    for _, commit := range m.CommitHistory {
+        if commit.Date.After(since) {
+            dateStr := commit.Date.Format("2006-01-02")
+            trend[dateStr]++
+        }
+    }
+    return trend
+}
+
+func (m *RepoMetadata) GetLanguageDistribution() map[string]float64 {
+    total := 0
+    dist := make(map[string]float64)
+    
+    for _, lines := range m.Languages {
+        total += lines
+    }
+    
+    if total > 0 {
+        for lang, lines := range m.Languages {
+            dist[lang] = float64(lines) / float64(total) * 100
+        }
+    }
+    
+    return dist
 }
