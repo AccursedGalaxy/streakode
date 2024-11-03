@@ -64,6 +64,11 @@ display_stats:
 
 goal_settings:
   weekly_commit_goal: 10
+
+colors:
+  header_color: "#FF96B4"
+  section_color: "#87CEEB"
+  divider_color: "#808080"
 ```
 
 > **Important**: The `author` field must match your Git author name exactly as it appears in your Git configuration. This ensures Streakode only tracks commits made by you. Use `streakode author` to verify your Git author name.

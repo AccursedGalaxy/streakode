@@ -17,6 +17,7 @@ type Config struct {
 	ScanDirectories []string `mapstructure:"scan_directories"`
 	RefreshInterval int      `mapstructure:"refresh_interval"`
 	DisplayStats    struct {
+		ShowWelcomeMessage bool `mapstructure:"show_welcome_message"`
 		ShowWeeklyCommits  bool `mapstructure:"show_weekly_commits"`
 		ShowMonthlyCommits bool `mapstructure:"show_monthly_commits"`
 		ShowTotalCommits   bool `mapstructure:"show_total_commits"`
@@ -27,6 +28,11 @@ type Config struct {
 	GoalSettings    struct {
 		WeeklyCommitGoal int `mapstructure:"weekly_commit_goal"`
 	} `mapstructure:"goal_settings"`
+	Colors struct {
+		HeaderColor  string `mapstructure:"header_color"`
+		SectionColor string `mapstructure:"section_color"`
+		DividerColor string `mapstructure:"divider_color"`
+	}
 }
 
 type State struct {
@@ -58,6 +64,17 @@ func (c *Config) ValidateConfig() error {
 	}
 	if c.GoalSettings.WeeklyCommitGoal < 0 {
 		return fmt.Errorf("goal_settings.weekly_commit_goal cannot be negative")
+	}
+
+	// Validate colors (optional - can remove this to allow empty colors)
+	if c.Colors.HeaderColor == "" {
+		c.Colors.HeaderColor = "#FF69B4"
+	}
+	if c.Colors.SectionColor == "" {
+		c.Colors.SectionColor = "#87CEEB"
+	}
+	if c.Colors.DividerColor == "" {
+		c.Colors.DividerColor = "#808080"
 	}
 	return nil
 }

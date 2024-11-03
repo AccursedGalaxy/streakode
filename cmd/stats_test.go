@@ -33,6 +33,7 @@ func TestDisplayStats(t *testing.T) {
 	config.AppConfig = config.Config{
 		Author: "TestUser",
 		DisplayStats: struct {
+			ShowWelcomeMessage bool `mapstructure:"show_welcome_message"`
 			ShowWeeklyCommits  bool `mapstructure:"show_weekly_commits"`
 			ShowMonthlyCommits bool `mapstructure:"show_monthly_commits"`
 			ShowTotalCommits   bool `mapstructure:"show_total_commits"`
@@ -40,6 +41,7 @@ func TestDisplayStats(t *testing.T) {
 			ShowInsights      bool `mapstructure:"show_insights"`
 			MaxProjects       int  `mapstructure:"max_projects"`
 		}{
+			ShowWelcomeMessage: true,
 			ShowWeeklyCommits:  true,
 			ShowMonthlyCommits: true,
 			ShowTotalCommits:   true,

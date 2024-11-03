@@ -22,6 +22,7 @@ func TestValidateConfig(t *testing.T) {
 				ScanDirectories: []string{"/test/dir"},
 				RefreshInterval: 60,
 				DisplayStats: struct {
+					ShowWelcomeMessage bool `mapstructure:"show_welcome_message"`
 					ShowWeeklyCommits  bool `mapstructure:"show_weekly_commits"`
 					ShowMonthlyCommits bool `mapstructure:"show_monthly_commits"`
 					ShowTotalCommits   bool `mapstructure:"show_total_commits"`
@@ -35,6 +36,15 @@ func TestValidateConfig(t *testing.T) {
 					WeeklyCommitGoal int `mapstructure:"weekly_commit_goal"`
 				}{
 					WeeklyCommitGoal: 10,
+				},
+				Colors: struct {
+					HeaderColor  string `mapstructure:"header_color"`
+					SectionColor string `mapstructure:"section_color"`
+					DividerColor string `mapstructure:"divider_color"`
+				}{
+					HeaderColor:  "#FFFFFF",
+					SectionColor: "#FFFFFF",
+					DividerColor: "#FFFFFF",
 				},
 			},
 			wantError: false,
@@ -86,6 +96,7 @@ func TestValidateConfig(t *testing.T) {
 				ScanDirectories: []string{"/test/dir"},
 				RefreshInterval: 60,
 				DisplayStats: struct {
+					ShowWelcomeMessage bool `mapstructure:"show_welcome_message"`
 					ShowWeeklyCommits  bool `mapstructure:"show_weekly_commits"`
 					ShowMonthlyCommits bool `mapstructure:"show_monthly_commits"`
 					ShowTotalCommits   bool `mapstructure:"show_total_commits"`
