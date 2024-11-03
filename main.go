@@ -183,10 +183,6 @@ func main() {
 					}
 				}
 			}
-			
-			// Show current streakode config
-			fmt.Printf("\nCurrent Streakode Configuration:\n")
-			fmt.Printf("Author: %s\n", config.AppConfig.Author)
 		},
 	}
 
