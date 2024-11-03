@@ -9,6 +9,7 @@ import (
 	"github.com/AccursedGalaxy/streakode/cmd"
 	"github.com/AccursedGalaxy/streakode/config"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var Version = "dev" // This will be overwritten during build
@@ -85,24 +86,55 @@ func main() {
 				return
 			}
 			
-			profile = args[0]
-			if profile == "default" || profile == "-" {
-				profile = ""
-				fmt.Println("Switched to default profile")
-			} else {
-				fmt.Printf("Switched to profile: %s\n", profile)
+			newProfile := args[0]
+			if newProfile == "default" || newProfile == "-" {
+				newProfile = ""
 			}
 			
-			config.AppState.ActiveProfile = profile
+			// Try to load the new profile's config first
+			viper.Reset()
+			viper.AddConfigPath("$HOME")
+			viper.SetConfigType("yaml")
+			
+			// Set config name based on profile
+			configName := ".streakodeconfig"
+			if newProfile != "" {
+				configName = ".streakodeconfig_" + newProfile
+			}
+			viper.SetConfigName(configName)
+			
+			// Try to read the config file
+			if err := viper.ReadInConfig(); err != nil {
+				fmt.Printf("Error: Could not load profile '%s': %v\n", newProfile, err)
+				os.Exit(1)
+			}
+			
+			// Try to unmarshal and validate the config
+			var newConfig config.Config
+			if err := viper.Unmarshal(&newConfig); err != nil {
+				fmt.Printf("Error: Invalid config format for profile '%s': %v\n", newProfile, err)
+				os.Exit(1)
+			}
+			
+			if err := newConfig.ValidateConfig(); err != nil {
+				fmt.Printf("Error: Invalid configuration for profile '%s': %v\n", newProfile, err)
+				os.Exit(1)
+			}
+			
+			// If we get here, the config is valid, so we can update the state
+			if newProfile == "" {
+				fmt.Println("Switched to default profile")
+			} else {
+				fmt.Printf("Switched to profile: %s\n", newProfile)
+			}
+			
+			config.AppState.ActiveProfile = newProfile
 			if err := config.SaveState(); err != nil {
 				fmt.Printf("Warning: Could not save profile state: %v\n", err)
 			}
 			
-			// Reload configuration with new profile
-			config.LoadConfig(profile)
-			
 			// Refresh cache for new profile
-			cacheFilePath := getCacheFilePath(profile)
+			cacheFilePath := getCacheFilePath(newProfile)
 			cache.InitCache()
 			cache.LoadCache(cacheFilePath)
 			cache.RefreshCache(config.AppConfig.ScanDirectories, config.AppConfig.Author, cacheFilePath)

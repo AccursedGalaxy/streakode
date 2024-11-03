@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -30,12 +31,36 @@ type Config struct {
 
 type State struct {
 	ActiveProfile string `json:"active_profile"`
+	IsValidated	  bool   `json:"is_validated"`
 }
 
 var (
 	AppConfig Config
 	AppState  State
 )
+
+// Validate Config
+func (c *Config) ValidateConfig() error {
+	if c.Author == "" {
+		return fmt.Errorf("author must be specified")
+	}
+	if c.DormantThreshold <= 0 {
+		return fmt.Errorf("dormant_threshold must be greater than 0")
+	}
+	if len(c.ScanDirectories) == 0 {
+		return fmt.Errorf("at least one scan directory must be specified")
+	}
+	if c.RefreshInterval <= 0 {
+		return fmt.Errorf("refresh_interval must be greater than 0")
+	}
+	if c.DisplayStats.MaxProjects <= 0 {
+		return fmt.Errorf("display_stats.max_projects must be greater than 0")
+	}
+	if c.GoalSettings.WeeklyCommitGoal < 0 {
+		return fmt.Errorf("goal_settings.weekly_commit_goal cannot be negative")
+	}
+	return nil
+}
 
 func SaveState() error {
 	home, err := os.UserHomeDir()
@@ -73,42 +98,54 @@ func LoadState() error {
 
 // LoadConfig initializes the config with optional profile selection
 func LoadConfig(profile string) {
-	// Load the state first
+	// Reset Viper's configuration
+	viper.Reset()
+
+	// Set up basic Viper configuration
+	viper.AddConfigPath("$HOME")
+	viper.SetConfigType("yaml")
+	viper.SetEnvPrefix("streakode")
+	viper.AutomaticEnv()
+
+	// Determine which config file to load
+	configName := ".streakodeconfig"
+	if profile != "" && profile != "default" && profile != "-" {
+		configName = ".streakodeconfig_" + profile
+	}
+	viper.SetConfigName(configName)
+
+	// Try to read the config file first
+	if err := viper.ReadInConfig(); err != nil {
+		log.Fatalf("Error reading config file '%s': %v", configName, err)
+	}
+
+	// Only after successful config load, we handle the state
 	if err := LoadState(); err != nil {
 		log.Printf("Warning: Could not load state: %v", err)
 	}
 
-	// If no profile is provided, use the one from state
-	if profile == "" {
-		profile = AppState.ActiveProfile
-	} else {
-		// Update state with new profile
+	// Update state with new profile
+	if profile != AppState.ActiveProfile {
 		AppState.ActiveProfile = profile
 		if err := SaveState(); err != nil {
 			log.Printf("Warning: Could not save state: %v", err)
 		}
 	}
 
-	// Always start with default config name
-	viper.SetConfigName(".streakodeconfig")
-	viper.AddConfigPath("$HOME")
-	viper.SetConfigType("yaml")
-	viper.SetEnvPrefix("streakode")
-	viper.AutomaticEnv()
-
-	// Only append profile suffix if it's not empty and not "default"
-	if profile != "" && profile != "default" && profile != "-" {
-		viper.SetConfigName(".streakodeconfig_" + profile)
-	}
-
-	// Read in Config and Check for Errors
-	if err := viper.ReadInConfig(); err != nil {
-		log.Fatalf("Error reading config file: %v", err)
-	}
-
 	// Unmarshal the config into the AppConfig struct
 	if err := viper.Unmarshal(&AppConfig); err != nil {
 		log.Fatalf("Unable to decode the config into struct: %v", err)
+	}
+
+	// Validate config only if not already validated
+	if !AppState.IsValidated {
+		if err := AppConfig.ValidateConfig(); err != nil {
+			log.Fatalf("Config validation failed: %v", err)
+		}
+		AppState.IsValidated = true
+		if err := SaveState(); err != nil {
+			log.Fatalf("Could not save validation state: %v", err)
+		}
 	}
 
 	// Expand home directory in scan directories
