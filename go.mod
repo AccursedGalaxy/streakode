@@ -8,6 +8,8 @@ require (
 	github.com/stretchr/testify v1.9.0
 )
 
+require github.com/olekukonko/tablewriter v0.0.5
+
 require (
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/charmbracelet/lipgloss v1.0.0

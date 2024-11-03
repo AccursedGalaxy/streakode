@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"sort"
 	"strings"
@@ -10,121 +11,111 @@ import (
 	"github.com/AccursedGalaxy/streakode/config"
 	"github.com/AccursedGalaxy/streakode/scan"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/olekukonko/tablewriter"
 )
+
+type repoInfo struct {
+    name       string
+    metadata   scan.RepoMetadata
+    lastCommit time.Time
+}
+
+// TODO: I think emojis are casuing the table to might get dispalyed wrongly on different devices/terminals - since emoji width might be different.
 
 // DisplayStats - Displays stats for all active repositories in a more compact format
 func DisplayStats() {
-	// Create styles
+	// Create a test table to calculate width
+	testBuf := new(bytes.Buffer)
+	testTable := tablewriter.NewWriter(testBuf)
+	testTable.SetHeader([]string{"Repository", "Weekly", "Streak", "Changes", "Activity"})
+	
+	// Use configured column widths
+	cfg := config.AppConfig.DisplayStats.TableStyle.MinColumnWidths
+	testTable.SetColMinWidth(0, cfg.Repository)
+	testTable.SetColMinWidth(1, cfg.Weekly)
+	testTable.SetColMinWidth(2, cfg.Streak)
+	testTable.SetColMinWidth(3, cfg.Changes)
+	testTable.SetColMinWidth(4, cfg.Activity)
+	testTable.Render()
+	
+	// Get the width from the rendered test table
+	tableWidth := len(strings.Split(testBuf.String(), "\n")[0])
+	
+	// Create styles with calculated width
 	style := lipgloss.NewStyle()
 	headerStyle := style.
 		Bold(true).
-		Foreground(lipgloss.Color(config.AppConfig.Colors.HeaderColor))
-	
-	sectionStyle := style.
-		Foreground(lipgloss.Color(config.AppConfig.Colors.SectionColor)).
-		PaddingLeft(2)
+		Foreground(lipgloss.Color(config.AppConfig.Colors.HeaderColor)).
+		Width(tableWidth).
+		Align(lipgloss.Center)
 	
 	dividerStyle := style.
 		Foreground(lipgloss.Color(config.AppConfig.Colors.DividerColor))
 	
-	// Track which sections are active
-	activeSections := 0
-
 	// Build sections dynamically
 	var sections []string
 
-	// Header section (shown if welcome message enabled)
+	// Header section
 	if config.AppConfig.DisplayStats.ShowWelcomeMessage {
 		header := headerStyle.Render(fmt.Sprintf("🚀 %s's Coding Activity", config.AppConfig.Author))
 		sections = append(sections, header)
 	}
 
-	// Stats section
-	if hasAnyStatsEnabled() {
-		activeSections++
-		stats := buildStatsSection()
-		if stats != "" {
-			sections = append(sections, sectionStyle.Render(stats))
+	// Weekly/Monthly stats (combine with header if enabled)
+	if config.AppConfig.DisplayStats.ShowWeeklyCommits || config.AppConfig.DisplayStats.ShowMonthlyCommits {
+		weeklyTotal := 0
+		monthlyTotal := 0
+		for _, repo := range cache.Cache {
+			if !repo.Dormant {
+				weeklyTotal += repo.WeeklyCommits
+				monthlyTotal += repo.MonthlyCommits
+			}
+		}
+		
+		var stats []string
+		if config.AppConfig.DisplayStats.ShowWeeklyCommits {
+			stats = append(stats, fmt.Sprintf("%d commits this week", weeklyTotal))
+		}
+		if config.AppConfig.DisplayStats.ShowMonthlyCommits {
+			stats = append(stats, fmt.Sprintf("%d this month", monthlyTotal))
+		}
+		if len(stats) > 0 {
+			statLine := headerStyle.Render(fmt.Sprintf("📊 %s", strings.Join(stats, " • ")))
+			sections = append(sections, statLine)
 		}
 	}
 
-	// Active projects section
+	// Active projects section (table)
 	if config.AppConfig.DisplayStats.ShowActiveProjects {
-		activeSections++
 		projects := buildProjectsSection()
 		if projects != "" {
-			sections = append(sections, sectionStyle.Render(projects))
-		}
-	}
-
-	// Calculate highest streak from cache
-	highestStreak := 0
-	for _, repo := range cache.Cache {
-		if repo.CurrentStreak > highestStreak {
-			highestStreak = repo.CurrentStreak
+			sections = append(sections, projects)
 		}
 	}
 
 	// Insights section
-	if config.AppConfig.DisplayStats.ShowInsights && highestStreak > 0 {
-		activeSections++
+	if config.AppConfig.DisplayStats.ShowInsights {
 		insights := buildInsightsSection()
 		if insights != "" {
-			sections = append(sections, sectionStyle.Render(insights))
+			sections = append(sections, insights)
 		}
 	}
 
-	// Only show dividers if we have multiple sections
-	divider := dividerStyle.Render("──────────────────────────────────────")
+	// Join sections with dynamically sized dividers
+	divider := dividerStyle.Render(strings.Repeat("─", tableWidth))
 	
-	// Join sections with dividers only if they're not empty
 	output := ""
 	for i, section := range sections {
 		if section == "" {
 			continue
 		}
-		output += section
-		if i < len(sections)-1 && sections[i+1] != "" {
+		if i > 0 {
 			output += "\n" + divider + "\n"
 		}
+		output += section
 	}
 
 	fmt.Println(output)
-}
-
-// Helper functions to build each section
-func hasAnyStatsEnabled() bool {
-	return config.AppConfig.DisplayStats.ShowWeeklyCommits ||
-		config.AppConfig.DisplayStats.ShowMonthlyCommits ||
-		config.AppConfig.DisplayStats.ShowTotalCommits
-}
-
-func buildStatsSection() string {
-	weeklyTotal := 0
-	monthlyTotal := 0
-	totalCommits := 0
-	
-	// Sum up the commits from each repo in the cache
-	for _, repo := range cache.Cache {
-		weeklyTotal += repo.WeeklyCommits
-		monthlyTotal += repo.MonthlyCommits
-		totalCommits += repo.CommitCount
-	}
-	
-	stats := []string{}
-	if config.AppConfig.DisplayStats.ShowWeeklyCommits {
-		stats = append(stats, fmt.Sprintf("%d commits this week", weeklyTotal))
-	}
-	if config.AppConfig.DisplayStats.ShowMonthlyCommits {
-		stats = append(stats, fmt.Sprintf("%d this month", monthlyTotal))
-	}
-	if config.AppConfig.DisplayStats.ShowTotalCommits {
-		stats = append(stats, fmt.Sprintf("%d total", totalCommits))
-	}
-	if len(stats) > 0 {
-		return fmt.Sprintf("📊 %s", strings.Join(stats, " • "))
-	}
-	return ""
 }
 
 func buildProjectsSection() string {
@@ -132,19 +123,7 @@ func buildProjectsSection() string {
 		return ""
 	}
 
-	totalProjects := len(cache.Cache)
-	maxDisplay := config.AppConfig.DisplayStats.MaxProjects
-	if maxDisplay <= 0 {
-		maxDisplay = 5
-	}
-	displayCount := min(totalProjects, maxDisplay)
-	
 	// Convert map to slice for sorting
-	type repoInfo struct {
-		name       string
-		metadata   scan.RepoMetadata
-		lastCommit time.Time
-	}
 	repos := make([]repoInfo, 0, len(cache.Cache))
 	for path, repo := range cache.Cache {
 		repoName := path[strings.LastIndex(path, "/")+1:]
@@ -160,66 +139,237 @@ func buildProjectsSection() string {
 		return repos[i].lastCommit.After(repos[j].lastCommit)
 	})
 
-	// Build summaries for each repo
-	var summaries []string
-	for i := 0; i < displayCount && i < len(repos); i++ {
+	// Create buffer for table
+	buf := new(bytes.Buffer)
+	table := tablewriter.NewWriter(buf)
+
+	// Configure table using config values
+	cfg := config.AppConfig.DisplayStats.TableStyle
+	table.SetHeader([]string{"Repository", "Weekly", "Streak", "Changes", "Activity"})
+	table.SetBorder(cfg.ShowBorder)
+	table.SetColumnSeparator(cfg.ColumnSeparator)
+	table.SetCenterSeparator(cfg.CenterSeparator)
+	table.SetHeaderAlignment(getAlignment(cfg.HeaderAlignment))
+	table.SetHeaderLine(cfg.ShowHeaderLine)
+	table.SetRowLine(cfg.ShowRowLines)
+	
+	// Set configured column widths
+	table.SetColMinWidth(0, cfg.MinColumnWidths.Repository)
+	table.SetColMinWidth(1, cfg.MinColumnWidths.Weekly)
+	table.SetColMinWidth(2, cfg.MinColumnWidths.Streak)
+	table.SetColMinWidth(3, cfg.MinColumnWidths.Changes)
+	table.SetColMinWidth(4, cfg.MinColumnWidths.Activity)
+
+	// All columns centered
+	table.SetColumnAlignment([]int{
+		tablewriter.ALIGN_CENTER,
+		tablewriter.ALIGN_CENTER,
+		tablewriter.ALIGN_CENTER,
+			tablewriter.ALIGN_CENTER,
+		tablewriter.ALIGN_CENTER,
+	})
+
+	displayCount := min(len(repos), config.AppConfig.DisplayStats.MaxProjects)
+	for i := 0; i < displayCount; i++ {
 		repo := repos[i]
-		repoName := repo.name
+		meta := repo.metadata
+
+		// Use configured activity indicators
+		indicators := config.AppConfig.DisplayStats.ActivityIndicators
+		thresholds := config.AppConfig.DisplayStats.Thresholds
 		
-		activity := "⚡"
-		if repo.metadata.WeeklyCommits > 10 {
-			activity = "🔥"
-		} else if repo.metadata.WeeklyCommits == 0 {
-			activity = "💤"
+		activity := indicators.NormalActivity
+		if meta.WeeklyCommits > thresholds.HighActivity {
+			activity = indicators.HighActivity
+		} else if meta.WeeklyCommits == 0 {
+			activity = indicators.NoActivity
 		}
 
-		summary := fmt.Sprintf("%s %s: %d↑ this week",
-			activity,
-			repoName[:min(len(repoName), 15)],
-			repo.metadata.WeeklyCommits)
-
-		if repo.metadata.CurrentStreak > 0 {
-			summary += fmt.Sprintf(" • 🔥 %d day streak", repo.metadata.CurrentStreak)
+		// Format streak with configured indicators
+		streakStr := fmt.Sprintf("%dd", meta.CurrentStreak)
+		if meta.CurrentStreak == meta.LongestStreak && meta.CurrentStreak > 0 {
+			streakStr += indicators.StreakRecord
+		} else if meta.CurrentStreak > 0 {
+			streakStr += indicators.ActiveStreak
 		}
 
-		daysAgo := time.Since(repo.lastCommit).Hours() / 24
-		if daysAgo < 1 {
-			summary += " • today"
-		} else if daysAgo < 2 {
-			summary += " • yesterday"
-		} else {
-			summary += fmt.Sprintf(" • %d days ago", int(daysAgo))
+		// Format activity
+		activityStr := "today"
+		if hours := time.Since(repo.lastCommit).Hours(); hours > 24 {
+			activityStr = fmt.Sprintf("%dd ago", int(hours/24))
 		}
-		
-		summaries = append(summaries, summary)
+
+		// Calculate weekly changes (always use detailed format)
+		var weeklyAdditions, weeklyDeletions int
+		weekStart := time.Now().AddDate(0, 0, -7)
+		for _, commit := range meta.CommitHistory {
+			if commit.Date.After(weekStart) {
+				weeklyAdditions += commit.Additions
+				weeklyDeletions += commit.Deletions
+			}
+		}
+		changesStr := fmt.Sprintf("+%d/-%d", weeklyAdditions, weeklyDeletions)
+
+		table.Append([]string{
+			fmt.Sprintf("%s %s", activity, repo.name),
+			fmt.Sprintf("%d↑", meta.WeeklyCommits),
+				streakStr,
+				changesStr,
+				activityStr,
+		})
 	}
 
-	return strings.Join(summaries, "\n")
+	table.Render()
+	return buf.String()
+}
+
+func formatLanguages(stats map[string]int, topCount int) string {
+	// Convert map to slice for sorting
+	type langStat struct {
+		lang  string
+		lines int
+	}
+	
+	langs := make([]langStat, 0, len(stats))
+	for lang, lines := range stats {
+		langs = append(langs, langStat{lang, lines})
+	}
+	
+	// Sort by line count descending
+	sort.Slice(langs, func(i, j int) bool {
+		return langs[i].lines > langs[j].lines
+	})
+	
+	// Format top 3 languages
+	var formatted []string
+	for i := 0; i < min(len(langs), topCount); i++ {
+		if langs[i].lines > 0 {
+			formatted = append(formatted, fmt.Sprintf("%s:%.1fk", 
+				langs[i].lang, float64(langs[i].lines)/1000))
+		}
+	}
+	
+	return strings.Join(formatted, ", ")
 }
 
 func buildInsightsSection() string {
-	highestStreak := 0
-	var streakChampRepo string
-	
-	for path, repo := range cache.Cache {
-		if repo.CurrentStreak > highestStreak {
-			highestStreak = repo.CurrentStreak
-			streakChampRepo = path
-		}
-	}
-	
-	if streakChampRepo == "" || highestStreak == 0 {
+	if !config.AppConfig.DisplayStats.ShowInsights {
 		return ""
 	}
+
+	insights := config.AppConfig.DisplayStats.InsightSettings
 	
-	return fmt.Sprintf("💫 %s is your most active project with a %d day streak!",
-		streakChampRepo[strings.LastIndex(streakChampRepo, "/")+1:],
-		highestStreak)
+	if config.AppConfig.DetailedStats {
+		buf := new(bytes.Buffer)
+		table := tablewriter.NewWriter(buf)
+		table.SetBorder(false)
+		table.SetColumnSeparator(" ")
+		table.SetHeaderLine(false)
+		table.SetRowLine(false)
+		table.SetAutoWrapText(false)
+
+		// Calculate global stats
+		totalWeeklyCommits := 0
+		totalMonthlyCommits := 0
+		totalAdditions := 0
+		totalDeletions := 0
+		languageStats := make(map[string]int)
+		hourStats := make(map[int]int)
+		
+		// Find peak coding hour
+		peakHour := 0
+		peakCommits := 0
+		
+		for _, repo := range cache.Cache {
+			if repo.Dormant {
+				continue
+			}
+			
+			totalWeeklyCommits += repo.WeeklyCommits
+			totalMonthlyCommits += repo.MonthlyCommits
+			
+			// Aggregate language stats
+			for lang, lines := range repo.Languages {
+				languageStats[lang] += lines
+			}
+			
+			// Calculate code changes and peak hours
+			weekStart := time.Now().AddDate(0, 0, -7)
+			for _, commit := range repo.CommitHistory {
+				if commit.Date.After(weekStart) {
+					totalAdditions += commit.Additions
+					totalDeletions += commit.Deletions
+					hour := commit.Date.Hour()
+					hourStats[hour]++
+					
+					// Update peak hour
+					if hourStats[hour] > peakCommits {
+						peakHour = hour
+						peakCommits = hourStats[hour]
+					}
+				}
+			}
+		}
+
+		// Only add configured insight rows
+		if insights.ShowWeeklySummary {
+			table.Append([]string{"📈", "Weekly Summary:", fmt.Sprintf("%d commits, +%d/-%d lines", 
+				totalWeeklyCommits, totalAdditions, totalDeletions)})
+		}
+		
+		if insights.ShowDailyAverage {
+			table.Append([]string{"📊", "Daily Average:", 
+				fmt.Sprintf("%.1f commits", float64(totalWeeklyCommits)/7.0)})
+		}
+
+		if insights.ShowTopLanguages && len(languageStats) > 0 {
+			langs := formatLanguages(languageStats, insights.TopLanguagesCount)
+			table.Append([]string{"💻", "Top Languages:", langs})
+		}
+
+		if insights.ShowPeakCoding {
+			table.Append([]string{"⏰", "Peak Coding:", 
+				fmt.Sprintf("%02d:00-%02d:00 (%d commits)", 
+				peakHour, (peakHour+1)%24, peakCommits)})
+		}
+
+		if insights.ShowWeeklyGoal && config.AppConfig.GoalSettings.WeeklyCommitGoal > 0 {
+			progress := float64(totalWeeklyCommits) / float64(config.AppConfig.GoalSettings.WeeklyCommitGoal) * 100
+			table.Append([]string{"🎯", "Weekly Goal:", 
+				fmt.Sprintf("%d%% (%d/%d commits)", 
+				int(progress), totalWeeklyCommits, config.AppConfig.GoalSettings.WeeklyCommitGoal)})
+		}
+
+		table.Render()
+		return buf.String()
+	} else {
+		// Simple insights for non-detailed view
+		if insights.ShowMostActive {
+			var mostProductiveRepo string
+			maxActivity := 0
+			for path, repo := range cache.Cache {
+				if repo.WeeklyCommits > maxActivity {
+					maxActivity = repo.WeeklyCommits
+					mostProductiveRepo = path[strings.LastIndex(path, "/")+1:]
+				}
+			}
+			if mostProductiveRepo != "" {
+				return fmt.Sprintf("  🌟 Most active: %s", mostProductiveRepo)
+			}
+		}
+	}
+
+	return ""
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
+// Helper function to convert string alignment to tablewriter constant
+func getAlignment(alignment string) int {
+	switch strings.ToLower(alignment) {
+	case "left":
+		return tablewriter.ALIGN_LEFT
+	case "right":
+		return tablewriter.ALIGN_RIGHT
+	default:
+		return tablewriter.ALIGN_CENTER
 	}
-	return b
 }

@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/AccursedGalaxy/streakode/scan"
 )
@@ -61,19 +62,33 @@ func SaveCache(filePath string) error {
 	return nil
 }
 
-// RefreshCache - scans directories and updates the cache with new metadata
+// Add new method to check if cache needs refresh
+func NeedsRefresh(path string, lastCommit time.Time) bool {
+	if cached, exists := Cache[path]; exists {
+		// Only refresh if new commits exist
+		return lastCommit.After(cached.LastCommit)
+	}
+	return true
+}
+
+// Modified RefreshCache
 func RefreshCache(dirs []string, author string, cacheFilePath string) error {
-	// Initialize a new empty cache
-	InitCache()
+	if Cache == nil {
+		InitCache()
+	}
 
 	repos, err := scan.ScanDirectories(dirs, author)
 	if err != nil {
 		log.Fatalf("Error scanning directories: %v", err)
 		return err
 	}
+
+	// Only update changed repositories
 	for _, repo := range repos {
-		Cache[repo.Path] = repo
+		if NeedsRefresh(repo.Path, repo.LastCommit) {
+			Cache[repo.Path] = repo
+		}
 	}
-	SaveCache(cacheFilePath)
-	return nil
+
+	return SaveCache(cacheFilePath)
 }
