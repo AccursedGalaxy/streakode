@@ -149,6 +149,9 @@ func buildProjectsSection() string {
 	}
 	repos := make([]repoInfo, 0, len(cache.Cache))
 	for path, repo := range cache.Cache {
+		// fmt.Printf("Debug - Cache entry for %s:\n", path)
+		// fmt.Printf("  - Weekly commits: %d\n", repo.WeeklyCommits)
+		// fmt.Printf("  - Commit history length: %d\n", len(repo.CommitHistory))
 		repoName := path[strings.LastIndex(path, "/")+1:]
 		repos = append(repos, repoInfo{
 			name:       repoName,
@@ -168,6 +171,11 @@ func buildProjectsSection() string {
 		repo := repos[i]
 		repoName := repo.name
 		
+		// fmt.Printf("Debug - Repository: %s\n", repoName)
+		// fmt.Printf("  - Weekly commits: %d\n", repo.metadata.WeeklyCommits)
+		// fmt.Printf("  - Commit history length: %d\n", len(repo.metadata.CommitHistory))
+		// fmt.Printf("  - Detailed stats enabled: %v\n", config.AppConfig.DetailedStats)
+		
 		activity := "⚡"
 		if repo.metadata.WeeklyCommits > 10 {
 			activity = "🔥"
@@ -186,7 +194,7 @@ func buildProjectsSection() string {
 
 		// Add detailed stats if enabled
 		if config.AppConfig.DetailedStats && len(repo.metadata.CommitHistory) > 0 {
-			// Calculate lines changed in the last week
+			// fmt.Printf("Debug - %s commit history: %d commits\n", repoName, len(repo.metadata.CommitHistory))
 			var additions, deletions int
 			for _, commit := range repo.metadata.CommitHistory {
 				if time.Since(commit.Date) <= 7*24*time.Hour {

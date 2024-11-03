@@ -103,8 +103,10 @@ func fetchRepoMeta(repoPath, author string) RepoMetadata {
 
 		// Only compute detailed stats if explicitly configured
 		if config.AppConfig.DetailedStats {
+			// fmt.Printf("Debug - Detailed stats enabled for %s\n", repoPath)
 			meta.initDetailedStats()
 			meta.updateDetailedStats(repoPath, author)
+			// fmt.Printf("Debug - After update: CommitHistory length = %d\n", len(meta.CommitHistory))
 		}
 	}
 
@@ -120,10 +122,13 @@ func (m *RepoMetadata) initDetailedStats() {
 
 func (m *RepoMetadata) updateDetailedStats(repoPath, author string) {
 	since := time.Now().AddDate(0, 0, -30) // Only fetch last 30 days for detailed stats
+	// fmt.Printf("Debug - Fetching detailed commit info for %s since %v\n", repoPath, since)
+	
 	if history, err := fetchDetailedCommitInfo(repoPath, author, since); err == nil {
 		m.CommitHistory = history
+		// fmt.Printf("Debug - Successfully fetched %d commits\n", len(history))
 	} else {
-		fmt.Printf("Error collecting detailed stats: %v", err)
+		fmt.Printf("Error collecting detailed stats for %s: %v\n", repoPath, err)
 	}
 }
 
@@ -131,16 +136,18 @@ func fetchDetailedCommitInfo(repoPath string, author string, since time.Time) ([
     var history []CommitHistory
     
     // Get detailed git log with stats
-    cmd := exec.Command("git", "-C", repoPath, "log",
+    gitCmd := exec.Command("git", "-C", repoPath, "log",
         "--all",
         "--author="+author,
         "--pretty=format:%H|%aI|%s",
         "--numstat",
         "--after="+since.Format("2006-01-02"))
     
-    output, err := cmd.Output()
+    // fmt.Printf("Debug - Running git command: %v\n", gitCmd.String())
+    
+    output, err := gitCmd.Output()
     if err != nil {
-        return nil, err
+        return nil, fmt.Errorf("git command failed: %v", err)
     }
 
     // Parse the git log output
