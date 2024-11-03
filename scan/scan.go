@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+  "sort"
 
 	"github.com/AccursedGalaxy/streakode/config"
 )
@@ -126,56 +127,56 @@ type StreakInfo struct {
 	Longest int
 }
 
-// TODO: Go through this streak calculation again to make sure it works as intended
-// TODO: Make sure commits are sorted by date before Streak calculation
 func calculateStreakInfo(dates []string) StreakInfo {
 	if len(dates) == 0 {
 		return StreakInfo{0, 0}
 	}
 
-	// Initialize variables
+	// Sort dates in ascending order (oldest to newest)
+	sort.Slice(dates, func(i, j int) bool {
+		date1, _ := time.Parse("2006-01-02 15:04:05 -0700", dates[i])
+		date2, _ := time.Parse("2006-01-02 15:04:05 -0700", dates[j])
+		return date1.Before(date2)
+	})
+
+	// Initialize streak variables
 	currentStreak := 1
 	longestStreak := 1
 	lastDate, _ := time.Parse("2006-01-02 15:04:05 -0700", dates[0])
 
-  // TODO: implement better timezone managemtn here instaed of using 1.5
-	// If last commit wasn't today or yesterday, current streak should be 0
-	daysSinceLastCommit := time.Since(lastDate).Hours() / 24
-	if daysSinceLastCommit > 1.5 { // Using 1.5 to account for timezone differences
-		return StreakInfo{0, longestStreak} // Current streak is 0, but keep longest
-	}
-
-	// Rest of streak calculation for longest streak...
-	dayMap := make(map[string]bool)
-	dayMap[lastDate.Format("2006-01-02")] = true
-
+	// Calculate longest streak and current streak
 	for i := 1; i < len(dates); i++ {
 		commitDate, err := time.Parse("2006-01-02 15:04:05 -0700", dates[i])
 		if err != nil {
 			continue
 		}
 
-		commitDay := commitDate.Format("2006-01-02")
-		if dayMap[commitDay] {
-			continue
-		}
-		dayMap[commitDay] = true
-
-		dayDiff := lastDate.Sub(commitDate).Hours() / 24
-
-		if dayDiff <= 1.5 { // Allow for timezone differences
+		// Check if the commit is the next day
+		if commitDate.Sub(lastDate).Hours() < 48 && commitDate.Sub(lastDate).Hours() >= 24 {
 			currentStreak++
+		} else if commitDate.Sub(lastDate).Hours() >= 48 {
+			// Reset current streak if more than a day gap is found
 			if currentStreak > longestStreak {
 				longestStreak = currentStreak
 			}
-		} else {
-			break // Stop counting current streak at first gap
+			currentStreak = 1 // Start a new streak
 		}
 
+		// Update last date to the current commitDate
 		lastDate = commitDate
 	}
 
-	return StreakInfo{currentStreak, longestStreak}
+	// Final check to update longest streak
+	if currentStreak > longestStreak {
+		longestStreak = currentStreak
+	}
+
+	// Check if the last streak is ongoing (today or yesterday)
+	if time.Since(lastDate).Hours() > 24 {
+		currentStreak = 0
+	}
+
+	return StreakInfo{Current: currentStreak, Longest: longestStreak}
 }
 
 // countRecentCommits - counts the number of commits in the last n days
