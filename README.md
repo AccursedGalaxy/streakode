@@ -186,12 +186,19 @@ make dev
 
 #### 1. Enhanced Historical Data Collection 📊
 
-We're expanding our data collection capabilities to provide deeper insights into coding patterns and productivity trends.
+Expanding data collection capabilities to provide deeper insights into coding patterns and productivity trends.
 
 **Key Improvements:**
 - Track commit metadata historically for advanced analytics
+  - Upgrade Current `RepoMetadata` struct to include more data.
+  - Implement Historical data stroage using the current caching system (may need upgrades) 
 - Analyze peak coding hours and most productive days
-- Monitor velocity changes over time
+  - Add new functions in the scanning logic to calculte:
+    - peak coding hours - save historical snapshots
+    - most producive days
+    - coding velocity
+- Monitor velocity and metrics changes over time
+  - Allows for a more in depth and egaging stats display
 
 **Implementation Details:**
 1. Extend `RepoMetadata` structure:
@@ -216,8 +223,7 @@ Enhance the user experience with visual progress tracking and goal management.
 
 #### 3. Enhanced Profile Management 👤
 
-Streamline profile management with new CLI commands:
-
+Streamline profile management with new CLI command
 
 ## License 📄
 
