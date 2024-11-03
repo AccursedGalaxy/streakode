@@ -2,8 +2,10 @@ package cache
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 
 	"github.com/AccursedGalaxy/streakode/scan"
 )
@@ -20,20 +22,16 @@ func InitCache() {
 func LoadCache(filePath string) error {
 	file, err := os.Open(filePath)
 	if os.IsNotExist(err) {
-		log.Printf("Cache file not found. Creating new cache.")
 		InitCache()
 		return nil
-	} else if err != nil {
-		log.Printf("Error opening cache file: %v", err)
-		return err
+	}
+	if err != nil {
+		return fmt.Errorf("error opening cache file: %v", err)
 	}
 	defer file.Close()
 
 	decoder := json.NewDecoder(file)
 	if err := decoder.Decode(&Cache); err != nil {
-		log.Printf("Error decoding cache file: %v. Recreating cache.", err)
-		file.Close() // Close the file before removing
-		os.Remove(filePath) // Delete the corrupted cache file
 		InitCache()
 		return nil
 	}
@@ -41,25 +39,27 @@ func LoadCache(filePath string) error {
 	return nil
 }
 
-
 // SaveCache - saves the in-memory cache to a JSON file
 func SaveCache(filePath string) error {
+	// Create directory if it doesn't exist
+	dir := filepath.Dir(filePath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("error creating directory: %v", err)
+	}
+
 	file, err := os.Create(filePath)
 	if err != nil {
-		log.Fatalf("Error creating cache file: %v", err)
-		return err
+		return fmt.Errorf("error creating cache file: %v", err)
 	}
 	defer file.Close()
 
 	encoder := json.NewEncoder(file)
 	if err := encoder.Encode(Cache); err != nil {
-		log.Fatalf("Error encoding cache: %v", err)
-		return err
+		return fmt.Errorf("error encoding cache: %v", err)
 	}
 
 	return nil
 }
-
 
 // RefreshCache - scans directories and updates the cache with new metadata
 func RefreshCache(dirs []string, author string, cacheFilePath string) error {

@@ -71,34 +71,49 @@ func ScanDirectories(dirs []string, author string) ([]RepoMetadata, error) {
 			if info.IsDir() && info.Name() == ".git" {
 				repoPath := filepath.Dir(path)
 				meta := fetchRepoMeta(repoPath, author)
-				if meta.AuthorVerified && !meta.Dormant {
-					repos = append(repos, meta)
+				if meta.AuthorVerified {
+					if !meta.Dormant {
+						repos = append(repos, meta)
+					}
 				}
 			}
 			return nil
 		})
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error walking directory %s: %v", dir, err)
 		}
 	}
+
 	return repos, nil
 }
 
 // calculateStreak - calculates the current streak of commits
 func calculateStreak(dates []string) int {
-	streak := 0
-	lastDate := time.Now()
-	for _, dateStr := range dates {
-		commitDate, err := time.Parse("2006-01-02 15:04:05 -0700", dateStr)
+	if len(dates) == 0 {
+		return 0
+	}
+
+	streak := 1
+	lastDate, _ := time.Parse("2006-01-02 15:04:05 -0700", dates[0])
+	currentDay := lastDate.Format("2006-01-02")
+
+	for i := 1; i < len(dates); i++ {
+		commitDate, err := time.Parse("2006-01-02 15:04:05 -0700", dates[i])
 		if err != nil {
 			continue
 		}
-		if commitDate.Before(lastDate.AddDate(0, 0, -1)) {
-			break
+
+		commitDay := commitDate.Format("2006-01-02")
+		dayDiff := lastDate.Sub(commitDate).Hours() / 24
+
+		// If it's a different day and the difference is 1 day
+		if commitDay != currentDay && dayDiff <= 1 {
+			streak++
+			lastDate = commitDate
+			currentDay = commitDay
 		}
-		streak++
-		lastDate = commitDate
 	}
+
 	return streak
 }
 
