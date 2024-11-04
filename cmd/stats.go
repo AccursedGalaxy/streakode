@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
+	"golang.org/x/term"
 )
 
 type repoInfo struct {
@@ -26,23 +27,17 @@ type repoInfo struct {
 
 // DisplayStats - Displays stats for all active repositories in a more compact format
 func DisplayStats() {
-	// Create a test table to calculate width
-	t := table.NewWriter()
-	t.AppendHeader(table.Row{"Repository", "Weekly", "Streak", "Changes", "Activity"})
+	// Get table width from the rendered table first
+	projectsSection := buildProjectsSection()
+	tableLines := strings.Split(projectsSection, "\n")
+	if len(tableLines) == 0 {
+		return
+	}
 	
-	// Use configured column widths
-	cfg := config.AppConfig.DisplayStats.TableStyle.MinColumnWidths
-	t.SetColumnConfigs([]table.ColumnConfig{
-		{Number: 1, WidthMin: cfg.Repository},
-		{Number: 2, WidthMin: cfg.Weekly},
-		{Number: 3, WidthMin: cfg.Streak},
-		{Number: 4, WidthMin: cfg.Changes},
-		{Number: 5, WidthMin: cfg.Activity},
-	})
+	// Get the actual table width from the first line (including borders)
+	tableWidth := len([]rune(tableLines[0])) // use runes to handle Unicode characters correctly
 	
-	tableWidth := len(strings.Split(t.Render(), "\n")[0])
-	
-	// Create styles with calculated width
+	// Create styles with calculated width - match table width exactly
 	style := lipgloss.NewStyle()
 	headerStyle := style.
 		Bold(true).
@@ -50,49 +45,18 @@ func DisplayStats() {
 		Width(tableWidth).
 		Align(lipgloss.Center)
 	
-	dividerStyle := style.
-		Foreground(lipgloss.Color(config.AppConfig.Colors.DividerColor)).
-		Width(tableWidth)
-	
 	// Build sections dynamically
 	var sections []string
 
 	// Header section
 	if config.AppConfig.DisplayStats.ShowWelcomeMessage {
-		header := headerStyle.Render(fmt.Sprintf("🚀 %s's Coding Activity", config.AppConfig.Author))
-		sections = append(sections, header)
-	}
-
-	// Weekly/Monthly stats (combine with header if enabled)
-	if config.AppConfig.DisplayStats.ShowWeeklyCommits || config.AppConfig.DisplayStats.ShowMonthlyCommits {
-		weeklyTotal := 0
-		monthlyTotal := 0
-		for _, repo := range cache.Cache {
-			if !repo.Dormant {
-				weeklyTotal += repo.WeeklyCommits
-				monthlyTotal += repo.MonthlyCommits
-			}
-		}
-		
-		var stats []string
-		if config.AppConfig.DisplayStats.ShowWeeklyCommits {
-			stats = append(stats, fmt.Sprintf("%d commits this week", weeklyTotal))
-		}
-		if config.AppConfig.DisplayStats.ShowMonthlyCommits {
-			stats = append(stats, fmt.Sprintf("%d this month", monthlyTotal))
-		}
-		if len(stats) > 0 {
-			statLine := headerStyle.Render(fmt.Sprintf("📊 %s", strings.Join(stats, " • ")))
-			sections = append(sections, statLine)
-		}
+		header := fmt.Sprintf("🚀 %s's Coding Activity", config.AppConfig.Author)
+		sections = append(sections, headerStyle.Render(header))
 	}
 
 	// Active projects section (table)
-	if config.AppConfig.DisplayStats.ShowActiveProjects {
-		projects := buildProjectsSection()
-		if projects != "" {
-			sections = append(sections, projects)
-		}
+	if config.AppConfig.DisplayStats.ShowActiveProjects && projectsSection != "" {
+		sections = append(sections, projectsSection)
 	}
 
 	// Insights section
@@ -103,8 +67,8 @@ func DisplayStats() {
 		}
 	}
 
-	// Join sections with dynamically sized dividers
-	divider := dividerStyle.Render(strings.Repeat("─", tableWidth))
+	// Create divider exactly matching table width
+	divider := strings.Repeat("─", tableWidth)
 	
 	output := ""
 	for i, section := range sections {
@@ -146,55 +110,64 @@ func buildProjectsSection() string {
 	t := table.NewWriter()
 	t.SetOutputMirror(buf)
 
-	// Configure table style
-	cfg := config.AppConfig.DisplayStats.TableStyle
+	// Get terminal width and adjust for borders
+	width, _, err := term.GetSize(0)
+	if err != nil {
+		width = 80
+	}
+	tableWidth := min(width-2, 120)
+
+	// Configure more compact table style
+	// cfg := config.AppConfig.DisplayStats.TableStyle
 	style := table.Style{
-			Box: table.BoxStyle{
-				BottomLeft:       "└",
-				BottomRight:      "┘",
-				BottomSeparator:  "┴",
-				Left:            cfg.ColumnSeparator,
-				LeftSeparator:    "├",
-				MiddleHorizontal: "─",
-				MiddleSeparator:  cfg.CenterSeparator,
-				MiddleVertical:   cfg.ColumnSeparator,
-				PaddingLeft:      " ",
-				PaddingRight:     " ",
-				Right:           cfg.ColumnSeparator,
-				RightSeparator:   "┤",
-				TopLeft:         "┌",
-				TopRight:        "┐",
-				TopSeparator:    "┬",
-			},
-			Options: table.Options{
-				DrawBorder:      cfg.ShowBorder,
-				SeparateColumns: true,
-				SeparateHeader:  cfg.ShowHeaderLine,
-				SeparateRows:    cfg.ShowRowLines,
-			},
-		}
+		Box: table.BoxStyle{
+			BottomLeft:       "└",
+			BottomRight:      "┘",
+			BottomSeparator:  "┴",
+			Left:            "│",
+			LeftSeparator:    "├",
+			MiddleHorizontal: "─",
+			MiddleSeparator:  "┼",
+			MiddleVertical:   "│",
+			PaddingLeft:      " ",
+			PaddingRight:     " ",
+			Right:           "│",
+			RightSeparator:   "┤",
+			TopLeft:         "┌",
+			TopRight:        "┐",
+			TopSeparator:    "┬",
+		},
+		Options: table.Options{
+			DrawBorder:      true,
+			SeparateColumns: true,
+			SeparateHeader:  true,
+			SeparateRows:    false, // Disable row separators for more compact look
+		},
+	}
 	t.SetStyle(style)
 
-	// Set column configs with proper alignment
-	headerAlign := text.AlignCenter
-	if cfg.HeaderAlignment == "left" {
-		headerAlign = text.AlignLeft
-	} else if cfg.HeaderAlignment == "right" {
-		headerAlign = text.AlignRight
-	}
+	// Calculate proportional widths (accounting for padding and separators)
+	totalPadding := 10 // Account for borders and column separators
+	availableWidth := tableWidth - totalPadding
+	
+	repoWidth := int(float64(availableWidth) * 0.4)
+	weeklyWidth := int(float64(availableWidth) * 0.15)
+	streakWidth := int(float64(availableWidth) * 0.15)
+	changesWidth := int(float64(availableWidth) * 0.15)
+	activityWidth := int(float64(availableWidth) * 0.15)
 
 	t.SetColumnConfigs([]table.ColumnConfig{
-		{Number: 1, WidthMin: cfg.MinColumnWidths.Repository, Align: text.AlignLeft, AlignHeader: headerAlign},
-		{Number: 2, WidthMin: cfg.MinColumnWidths.Weekly, Align: text.AlignCenter, AlignHeader: headerAlign},
-		{Number: 3, WidthMin: cfg.MinColumnWidths.Streak, Align: text.AlignCenter, AlignHeader: headerAlign},
-		{Number: 4, WidthMin: cfg.MinColumnWidths.Changes, Align: text.AlignCenter, AlignHeader: headerAlign},
-		{Number: 5, WidthMin: cfg.MinColumnWidths.Activity, Align: text.AlignCenter, AlignHeader: headerAlign},
+		{Number: 1, WidthMax: repoWidth, WidthMin: 10, Align: text.AlignLeft, AlignHeader: text.AlignLeft},
+		{Number: 2, WidthMax: weeklyWidth, WidthMin: 8, Align: text.AlignCenter, AlignHeader: text.AlignCenter},
+		{Number: 3, WidthMax: streakWidth, WidthMin: 8, Align: text.AlignCenter, AlignHeader: text.AlignCenter},
+		{Number: 4, WidthMax: changesWidth, WidthMin: 10, Align: text.AlignCenter, AlignHeader: text.AlignCenter},
+		{Number: 5, WidthMax: activityWidth, WidthMin: 8, Align: text.AlignCenter, AlignHeader: text.AlignCenter},
 	})
 
 	displayCount := min(len(repos), config.AppConfig.DisplayStats.MaxProjects)
 	for i := 0; i < displayCount; i++ {
 		repo := repos[i]
-		meta := repo.metadata
+			meta := repo.metadata
 
 		// Use configured activity indicators
 		indicators := config.AppConfig.DisplayStats.ActivityIndicators
@@ -281,6 +254,13 @@ func buildInsightsSection() string {
 		return ""
 	}
 
+	// Get the same terminal width as used elsewhere
+	width, _, err := term.GetSize(0)
+	if err != nil {
+		width = 80
+	}
+	tableWidth := min(width-2, 120)
+
 	insights := config.AppConfig.DisplayStats.InsightSettings
 	
 	if config.AppConfig.DetailedStats {
@@ -288,25 +268,19 @@ func buildInsightsSection() string {
 		t.SetStyle(table.Style{
 			Options: table.Options{
 				DrawBorder:      false,
-				SeparateColumns: true,  // Controls column separator
-				SeparateHeader:  false, // Instead of SetHeaderLine
-				SeparateRows:    false, // Instead of SetRowLine
+				SeparateColumns: true,
+				SeparateHeader:  false,
+				SeparateRows:    false,
 			},
 			Box: table.BoxStyle{
 				PaddingLeft:      " ",
 				PaddingRight:     " ",
-				MiddleVertical:   " ", // Column separator character
+				MiddleVertical:   " ",
 			},
 		})
 
-		// Note: AutoWrap is controlled per column via ColumnConfig if needed
-		t.SetColumnConfigs([]table.ColumnConfig{
-			{Number: 1, WidthMax: 0}, // WidthMax: 0 disables auto-wrapping
-			{Number: 2, WidthMax: 0},
-			{Number: 3, WidthMax: 0},
-			{Number: 4, WidthMax: 0},
-			{Number: 5, WidthMax: 0},
-		})
+		// Set max width for the entire table
+		t.SetAllowedRowLength(tableWidth-2)
 
 		// Calculate global stats
 		totalWeeklyCommits := 0

@@ -18,6 +18,7 @@ require (
 	github.com/jedib0t/go-pretty/v6 v6.6.1 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
 	go.mongodb.org/mongo-driver v1.17.1 // indirect
+	golang.org/x/term v0.25.0 // indirect
 )
 
 require (
