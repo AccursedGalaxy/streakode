@@ -73,7 +73,13 @@ func main() {
 		Short: "Refresh the streakode cache",
 		Run: func(cobraCmd *cobra.Command, args []string) {
 			cacheFilePath := getCacheFilePath(profile)
-			err := cache.RefreshCache(config.AppConfig.ScanDirectories, config.AppConfig.Author, cacheFilePath)
+			err := cache.RefreshCache(
+				config.AppConfig.ScanDirectories,
+				config.AppConfig.Author,
+				cacheFilePath,
+				config.AppConfig.ScanSettings.ExcludedPatterns,
+				config.AppConfig.ScanSettings.ExcludedPaths,
+			)
 			if err == nil {
 				fmt.Println("✨ Cache refreshed successfully!")
 			}
@@ -124,7 +130,7 @@ func main() {
 				os.Exit(1)
 			}
 			
-      // Validate the config
+      		// Validate the config
 			if err := newConfig.ValidateConfig(); err != nil {
 				fmt.Printf("Error: Invalid configuration for profile '%s': %v\n", newProfile, err)
 				os.Exit(1)
@@ -146,7 +152,13 @@ func main() {
 			cacheFilePath := getCacheFilePath(newProfile)
 			cache.InitCache()
 			cache.LoadCache(cacheFilePath)
-			cache.RefreshCache(config.AppConfig.ScanDirectories, config.AppConfig.Author, cacheFilePath)
+			cache.RefreshCache(
+				config.AppConfig.ScanDirectories,
+				config.AppConfig.Author,
+				cacheFilePath,
+				config.AppConfig.ScanSettings.ExcludedPatterns,
+				config.AppConfig.ScanSettings.ExcludedPaths,
+			)
 		},
 	}
 

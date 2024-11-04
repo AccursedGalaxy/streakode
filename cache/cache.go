@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/AccursedGalaxy/streakode/scan"
@@ -75,15 +76,41 @@ func NeedsRefresh(path string, lastCommit time.Time) bool {
 	return true
 }
 
-// Modified RefreshCache
-func RefreshCache(dirs []string, author string, cacheFilePath string) error {
+// Modified RefreshCache to support exclusions
+func RefreshCache(dirs []string, author string, cacheFilePath string, excludedPatterns []string, excludedPaths []string) error {
 	if Cache == nil {
 		InitCache()
 	}
 
-	repos, err := scan.ScanDirectories(dirs, author)
+	// Create a function to check if a path should be excluded
+	shouldExclude := func(path string) bool {
+		// Check full path exclusions
+		for _, excludedPath := range excludedPaths {
+			if strings.HasPrefix(path, excludedPath) {
+				return true
+			}
+		}
+
+		// Check pattern-based exclusions
+		for _, pattern := range excludedPatterns {
+			if strings.Contains(path, pattern) {
+				return true
+			}
+		}
+		return false
+	}
+
+	// Filter out excluded directories before scanning
+	var filteredDirs []string
+	for _, dir := range dirs {
+		if !shouldExclude(dir) {
+			filteredDirs = append(filteredDirs, dir)
+		}
+	}
+
+	repos, err := scan.ScanDirectories(filteredDirs, author, shouldExclude)
 	if err != nil {
-		log.Fatalf("Error scanning directories: %v", err)
+		log.Printf("Error scanning directories: %v", err)
 		return err
 	}
 

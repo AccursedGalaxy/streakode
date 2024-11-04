@@ -15,6 +15,10 @@ type Config struct {
 	Author          string   `mapstructure:"author"`
 	DormantThreshold int      `mapstructure:"dormant_threshold"`
 	ScanDirectories []string `mapstructure:"scan_directories"`
+	ScanSettings struct {
+		ExcludedPatterns []string `mapstructure:"excluded_patterns"` // e.g., ["node_modules", "dist", ".git"]
+		ExcludedPaths    []string `mapstructure:"excluded_paths"`    // Full paths to exclude
+	} `mapstructure:"scan_settings"`
 	RefreshInterval int      `mapstructure:"refresh_interval"`
 	DisplayStats    struct {
 		ShowWelcomeMessage bool `mapstructure:"show_welcome_message"`

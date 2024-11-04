@@ -67,8 +67,6 @@ type RepoMetadata struct {
 
 }
 
-// TODO: allow users to setup direcotires or files to exclude frm the scan via config
-
 // fetchRepoMeta - gets metadata for a single repository and verifies user
 func fetchRepoMeta(repoPath, author string) RepoMetadata {
 	meta := RepoMetadata{
@@ -206,7 +204,7 @@ func fetchDetailedCommitInfo(repoPath string, author string, since time.Time) ([
 }
 
 // ScanDirectories - scans for Git repositories in the specified directories
-func ScanDirectories(dirs []string, author string) ([]RepoMetadata, error) {
+func ScanDirectories(dirs []string, author string, shouldExclude func(string) bool) ([]RepoMetadata, error) {
 	var repos []RepoMetadata
 
 	for _, dir := range dirs {
@@ -219,6 +217,9 @@ func ScanDirectories(dirs []string, author string) ([]RepoMetadata, error) {
 			}
 			if info.IsDir() && info.Name() == ".git" {
 				repoPath := filepath.Dir(path)
+				if shouldExclude(repoPath) {
+					return nil
+				}
 				meta := fetchRepoMeta(repoPath, author)
 				if meta.AuthorVerified {
 					if !meta.Dormant {
