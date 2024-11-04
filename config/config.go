@@ -26,6 +26,8 @@ type Config struct {
 		ShowInsights      bool `mapstructure:"show_insights"`
 		MaxProjects       int  `mapstructure:"max_projects"`
 		TableStyle struct {
+			UseTableHeader 	bool 		`mapstructure:"use_table_header"`
+			Style			string		`mapstructure:"style"`
 			MinColumnWidths   struct {
 				Repository int `mapstructure:"repository"`
 				Weekly    int `mapstructure:"weekly"`
@@ -33,6 +35,12 @@ type Config struct {
 				Changes   int `mapstructure:"changes"`
 				Activity  int `mapstructure:"activity"`
 			} `mapstructure:"min_column_widths"`
+			Options struct {
+				DrawBorder	bool	`mapstructure:"draw_border"`
+				SeparateColumns bool	`mapstructure:"separate_columns"`
+				SeparateHeader bool	`mapstructure:"separate_header"`
+				SeparateRows bool	`mapstructure:"separate_rows"`
+			} `mapstructure:"options"`
 		} `mapstructure:"table_style"`
 		ActivityIndicators struct {
 			HighActivity    string `mapstructure:"high_activity"`

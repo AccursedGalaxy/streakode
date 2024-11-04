@@ -21,9 +21,6 @@ type repoInfo struct {
     lastCommit time.Time
 }
 
-// TODO: emojis are casuing the table to get dispalyed wrongly on different devices/terminals - since emoji width might be different.
-// -> Added user specified emoji width settings. -> Still causes rows where emojis are present to be lsightly wider than other rows or separators.
-
 // DisplayStats - Displays stats for all active repositories in a more compact format
 func DisplayStats() {
 	// Get table width from the rendered table first
@@ -77,7 +74,7 @@ func DisplayStats() {
 			if i > 0 {
 				output += "\n" + divider + "\n"
 			}
-			output += section
+			output += strings.TrimSpace(section)
 		}
 	} else {
 		// Join sections directly without dividers
@@ -86,7 +83,7 @@ func DisplayStats() {
 				if output != "" {
 					output += "\n"
 				}
-				output += section
+				output += strings.TrimSpace(section)
 			}
 		}
 	}
@@ -119,6 +116,17 @@ func buildProjectsSection() string {
 	buf := new(bytes.Buffer)
 	t := table.NewWriter()
 	t.SetOutputMirror(buf)
+
+	// Add Table Header if Set in config
+	if config.AppConfig.DisplayStats.TableStyle.UseTableHeader{
+		t.AppendHeader(table.Row{
+			"Repo",
+			"Weekly",
+			"Streak",
+			"Changes",
+			"Activity",
+		})
+	}
 
 	// Simplify width calculations
 	width, _, err := term.GetSize(0)
@@ -159,10 +167,10 @@ func buildProjectsSection() string {
 			TopSeparator:    "┬",
 		},
 		Options: table.Options{
-			DrawBorder:      true,
-			SeparateColumns: true,
-			SeparateHeader:  true,
-			SeparateRows:    false,
+			DrawBorder:      config.AppConfig.DisplayStats.TableStyle.Options.DrawBorder,
+			SeparateColumns: config.AppConfig.DisplayStats.TableStyle.Options.SeparateColumns,
+			SeparateHeader:  config.AppConfig.DisplayStats.TableStyle.Options.SeparateHeader,
+			SeparateRows:    config.AppConfig.DisplayStats.TableStyle.Options.SeparateRows,
 		},
 	}
 	t.SetStyle(style)
@@ -218,6 +226,20 @@ func buildProjectsSection() string {
 		})
 	}
 
+	// TODO: integrate into user config. -- Colored styles mess with table width
+	switch strings.ToLower(config.AppConfig.DisplayStats.TableStyle.Style) {
+	case "rounded":
+		t.SetStyle(table.StyleRounded)
+	case "bold":
+		t.SetStyle(table.StyleBold)
+	case "light":
+		t.SetStyle(table.StyleLight)
+	case "double":
+		t.SetStyle(table.StyleDouble)
+	default:
+		t.SetStyle(table.StyleDefault)
+	}
+
 	// Render to buffer and return
 	t.Render()
 	return buf.String()
@@ -270,13 +292,13 @@ func buildInsightsSection() string {
 		t := table.NewWriter()
 		t.SetStyle(table.Style{
 			Options: table.Options{
-				DrawBorder:      false,
-				SeparateColumns: false,
-				SeparateHeader:  false,
-				SeparateRows:    false,
+				DrawBorder:      config.AppConfig.DisplayStats.TableStyle.Options.DrawBorder,
+				SeparateColumns: config.AppConfig.DisplayStats.TableStyle.Options.SeparateColumns,
+				SeparateHeader:  config.AppConfig.DisplayStats.TableStyle.Options.SeparateHeader,
+				SeparateRows:    config.AppConfig.DisplayStats.TableStyle.Options.SeparateRows,
 			},
 			Box: table.BoxStyle{
-				PaddingLeft:      " ",
+				PaddingLeft:      "",
 				PaddingRight:     " ",
 				MiddleVertical:   "",
 			},
@@ -330,9 +352,7 @@ func buildInsightsSection() string {
 
 		// Only add configured insight rows
 		if insights.ShowWeeklySummary {
-			t.AppendRow(table.Row{
-				"📈",  // No padding needed for single-column emojis
-				"Weekly Summary:", 
+			t.AppendRow(table.Row{"📈", "Weekly Summary:", 
 				fmt.Sprintf("%d commits, +%d/-%d lines", 
 					totalWeeklyCommits, totalAdditions, totalDeletions)})
 		}
