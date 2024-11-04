@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/AccursedGalaxy/streakode/config"
 	"github.com/AccursedGalaxy/streakode/scan"
 	"github.com/stretchr/testify/assert"
 )
@@ -57,7 +58,7 @@ func TestRefreshCache(t *testing.T) {
 
 	// Test refreshing cache with test directories
 	dirs := []string{"./testdata"} // You'll need to create this directory with test repos
-	err = RefreshCache(dirs, "test-author", tmpFile.Name())
+	err = RefreshCache(dirs, "test-author", tmpFile.Name(), config.AppConfig.ScanSettings.ExcludedPaths, config.AppConfig.ScanSettings.ExcludedPatterns)
 	assert.NoError(t, err)
 }
 

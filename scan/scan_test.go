@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -75,9 +76,20 @@ func TestScanDirectories(t *testing.T) {
 		_, err = os.Stat(filepath.Join(repoPath, ".git"))
 		assert.NoError(t, err, "Git directory not created in %s", repoPath)
 	}
-
 	// Test scanning
-	results, err := ScanDirectories([]string{baseDir}, "test-author")
+	results, err := ScanDirectories([]string{baseDir}, "test-author", func(path string) bool {
+		for _, excluded := range config.AppConfig.ScanSettings.ExcludedPaths {
+			if strings.HasPrefix(path, excluded) {
+				return true
+			}
+		}
+		for _, pattern := range config.AppConfig.ScanSettings.ExcludedPatterns {
+			if matched, _ := filepath.Match(pattern, filepath.Base(path)); matched {
+				return true
+			}
+		}
+		return false
+	})
 	if err != nil {
 		t.Fatalf("ScanDirectories failed: %v", err)
 	}
