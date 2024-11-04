@@ -47,9 +47,12 @@ func DisplayStats() {
 	// TODO: Needs to get centered above Table - Dynamically Based On Table Width
 	// Header section
 	if config.AppConfig.DisplayStats.ShowWelcomeMessage {
-		header := fmt.Sprintf("🚀 %s's Coding Activity", config.AppConfig.Author)
-		sections = append(sections, headerStyle.Render(header))
+		headerText := fmt.Sprintf("🚀 %s's Coding Activity", config.AppConfig.Author)
+		padding := (tableWidth - len([]rune(headerText))) / 2
+		centeredHeader := fmt.Sprintf("%*s%s%*s", padding, "", headerText, padding, "")
+		sections = append(sections, headerStyle.Render(centeredHeader))
 	}
+
 
 	// Active projects section (table)
 	if config.AppConfig.DisplayStats.ShowActiveProjects && projectsSection != "" {
