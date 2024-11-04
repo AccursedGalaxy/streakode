@@ -22,19 +22,10 @@ type Config struct {
 	RefreshInterval int      `mapstructure:"refresh_interval"`
 	DisplayStats    struct {
 		ShowWelcomeMessage bool `mapstructure:"show_welcome_message"`
-		ShowWeeklyCommits  bool `mapstructure:"show_weekly_commits"`
-		ShowMonthlyCommits bool `mapstructure:"show_monthly_commits"`
-		ShowTotalCommits   bool `mapstructure:"show_total_commits"`
 		ShowActiveProjects bool `mapstructure:"show_active_projects"`
 		ShowInsights      bool `mapstructure:"show_insights"`
 		MaxProjects       int  `mapstructure:"max_projects"`
 		TableStyle struct {
-			ShowBorder        bool   `mapstructure:"show_border"`
-			ColumnSeparator   string `mapstructure:"column_separator"`
-			CenterSeparator   string `mapstructure:"center_separator"`
-			HeaderAlignment   string `mapstructure:"header_alignment"`
-			ShowHeaderLine    bool   `mapstructure:"show_header_line"`
-			ShowRowLines      bool   `mapstructure:"show_row_lines"`
 			MinColumnWidths   struct {
 				Repository int `mapstructure:"repository"`
 				Weekly    int `mapstructure:"weekly"`
@@ -44,19 +35,17 @@ type Config struct {
 			} `mapstructure:"min_column_widths"`
 		} `mapstructure:"table_style"`
 		ActivityIndicators struct {
-			HighActivity    string `mapstructure:"high_activity"`     // 🔥
-			NormalActivity string `mapstructure:"normal_activity"`    // ⚡
-			NoActivity     string `mapstructure:"no_activity"`        // 💤
-			StreakRecord   string `mapstructure:"streak_record"`      // 🏆
-			ActiveStreak   string `mapstructure:"active_streak"`      // 🔥
+			HighActivity    string `mapstructure:"high_activity"`
+			NormalActivity  string `mapstructure:"normal_activity"`
+			NoActivity      string `mapstructure:"no_activity"`
+			StreakRecord   string `mapstructure:"streak_record"`
+			ActiveStreak   string `mapstructure:"active_streak"`
 		} `mapstructure:"activity_indicators"`
-		UseFixedEmojiWidth	bool	`mapstructure:"use_fixed_emoji_widht"` 
-		FixedEmojiWidth		int		`mapstructure:"fixed_emoji_width"` 
 		Thresholds struct {
-			HighActivity int `mapstructure:"high_activity"` // commits > 10 for high activity
+			HighActivity int `mapstructure:"high_activity"`
 		} `mapstructure:"thresholds"`
 		InsightSettings struct {
-			TopLanguagesCount int  `mapstructure:"top_languages_count"` // number of top languages to show
+			TopLanguagesCount int  `mapstructure:"top_languages_count"`
 			ShowDailyAverage  bool `mapstructure:"show_daily_average"`
 			ShowTopLanguages  bool `mapstructure:"show_top_languages"`
 			ShowPeakCoding    bool `mapstructure:"show_peak_coding"`
@@ -70,10 +59,8 @@ type Config struct {
 	} `mapstructure:"goal_settings"`
 	Colors struct {
 		HeaderColor  string `mapstructure:"header_color"`
-		SectionColor string `mapstructure:"section_color"`
-		DividerColor string `mapstructure:"divider_color"`
 	}
-	DetailedStats bool `mapstructure:"detailed_stats" yaml:"detailed_stats"`
+	DetailedStats bool `mapstructure:"detailed_stats"`
 	LanguageSettings struct {
 		ExcludedExtensions []string `mapstructure:"excluded_extensions"` // e.g., [".yaml", ".txt", ".md"]
 		ExcludedLanguages  []string `mapstructure:"excluded_languages"`  // e.g., ["YAML", "Text", "Markdown"]
@@ -116,12 +103,6 @@ func (c *Config) ValidateConfig() error {
 	// Validate colors (optional - can remove this to allow empty colors)
 	if c.Colors.HeaderColor == "" {
 		c.Colors.HeaderColor = "#FF69B4"
-	}
-	if c.Colors.SectionColor == "" {
-		c.Colors.SectionColor = "#87CEEB"
-	}
-	if c.Colors.DividerColor == "" {
-		c.Colors.DividerColor = "#808080"
 	}
 
 	// Validate table style
