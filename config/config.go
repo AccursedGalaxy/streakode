@@ -50,6 +50,8 @@ type Config struct {
 			StreakRecord   string `mapstructure:"streak_record"`      // 🏆
 			ActiveStreak   string `mapstructure:"active_streak"`      // 🔥
 		} `mapstructure:"activity_indicators"`
+		UseFixedEmojiWidth	bool	`mapstructure:"use_fixed_emoji_widht"` 
+		FixedEmojiWidth		int		`mapstructure:"fixed_emoji_width"` 
 		Thresholds struct {
 			HighActivity int `mapstructure:"high_activity"` // commits > 10 for high activity
 		} `mapstructure:"thresholds"`

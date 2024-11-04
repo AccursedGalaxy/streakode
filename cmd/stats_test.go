@@ -133,9 +133,14 @@ func TestDisplayStats(t *testing.T) {
 				StreakRecord:   "🏆",
 				ActiveStreak:   "🔥",
 			},
+			UseFixedEmojiWidth: bool `mapstructure:"use_fixed_emoji_width"`,
+			FixedEmojiWidth: int `mapstructure:"fixed_emoji_width"`,
 			Thresholds: struct {
 				HighActivity int `mapstructure:"high_activity"`
 			}{
+				HighActivity: 10,
+			},
+			{
 				HighActivity: 10,
 			},
 			InsightSettings: struct {

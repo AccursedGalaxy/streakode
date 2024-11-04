@@ -20,7 +20,7 @@ type repoInfo struct {
     lastCommit time.Time
 }
 
-// TODO: I think emojis are casuing the table to might get dispalyed wrongly on different devices/terminals - since emoji width might be different.
+// TODO: emojis are casuing the table to get dispalyed wrongly on different devices/terminals - since emoji width might be different.
 
 // DisplayStats - Displays stats for all active repositories in a more compact format
 func DisplayStats() {
@@ -211,11 +211,11 @@ func buildProjectsSection() string {
 		changesStr := fmt.Sprintf("+%d/-%d", weeklyAdditions, weeklyDeletions)
 
 		table.Append([]string{
-			fmt.Sprintf("%s %s", activity, repo.name),
+			padWithEmoji(activity, repo.name),
 			fmt.Sprintf("%d↑", meta.WeeklyCommits),
-				streakStr,
-				changesStr,
-				activityStr,
+			streakStr,
+			changesStr,
+			activityStr,
 		})
 	}
 
@@ -313,8 +313,11 @@ func buildInsightsSection() string {
 
 		// Only add configured insight rows
 		if insights.ShowWeeklySummary {
-			table.Append([]string{"📈", "Weekly Summary:", fmt.Sprintf("%d commits, +%d/-%d lines", 
-				totalWeeklyCommits, totalAdditions, totalDeletions)})
+			table.Append([]string{
+				"📈",  // No padding needed for single-column emojis
+				"Weekly Summary:", 
+				fmt.Sprintf("%d commits, +%d/-%d lines", 
+					totalWeeklyCommits, totalAdditions, totalDeletions)})
 		}
 		
 		if insights.ShowDailyAverage {
@@ -372,4 +375,11 @@ func getAlignment(alignment string) int {
 	default:
 		return tablewriter.ALIGN_CENTER
 	}
+}
+
+// Add these new helper functions
+func padWithEmoji(emoji, text string) string {
+	// Use zero-width spaces to ensure consistent width
+	paddedEmoji := emoji + "\u200B" // Add zero-width space after emoji
+	return fmt.Sprintf("%s %s", paddedEmoji, text)
 }
