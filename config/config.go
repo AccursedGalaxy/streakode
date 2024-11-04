@@ -79,6 +79,7 @@ type Config struct {
 		ExcludedLanguages  []string `mapstructure:"excluded_languages"`  // e.g., ["YAML", "Text", "Markdown"]
 		MinimumLines      int      `mapstructure:"minimum_lines"`       // Minimum lines for a language to be included
 	} `mapstructure:"language_settings"`
+	ShowDividers bool `mapstructure:"show_dividers"` 
 }
 
 type State struct {

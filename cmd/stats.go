@@ -66,18 +66,29 @@ func DisplayStats() {
 		}
 	}
 
-	// Create divider exactly matching table width
-	divider := strings.Repeat("─", tableWidth)
-	
+	// Join sections with dividers only if configured
 	output := ""
-	for i, section := range sections {
-		if section == "" {
-			continue
+	if config.AppConfig.ShowDividers {
+		divider := strings.Repeat("─", tableWidth)
+		for i, section := range sections {
+			if section == "" {
+				continue
+			}
+			if i > 0 {
+				output += "\n" + divider + "\n"
+			}
+			output += section
 		}
-		if i > 0 {
-			output += "\n" + divider + "\n"
+	} else {
+		// Join sections directly without dividers
+		for _, section := range sections {
+			if section != "" {
+				if output != "" {
+					output += "\n"
+				}
+				output += section
+			}
 		}
-		output += section
 	}
 
 	fmt.Println(output)
@@ -260,14 +271,14 @@ func buildInsightsSection() string {
 		t.SetStyle(table.Style{
 			Options: table.Options{
 				DrawBorder:      false,
-				SeparateColumns: true,
+				SeparateColumns: false,
 				SeparateHeader:  false,
 				SeparateRows:    false,
 			},
 			Box: table.BoxStyle{
 				PaddingLeft:      " ",
 				PaddingRight:     " ",
-				MiddleVertical:   " ",
+				MiddleVertical:   "",
 			},
 		})
 
