@@ -21,6 +21,7 @@ type repoInfo struct {
 }
 
 // TODO: emojis are casuing the table to get dispalyed wrongly on different devices/terminals - since emoji width might be different.
+// -> Added user specified emoji width settings. -> Still causes rows where emojis are present to be lsightly wider than other rows or separators.
 
 // DisplayStats - Displays stats for all active repositories in a more compact format
 func DisplayStats() {
