@@ -1,0 +1,98 @@
+author: test-user
+dormant_threshold: 30
+scan_directories:
+  - ~/code
+scan_settings:
+  excluded_patterns:
+    - "node_modules"
+    - "dist"
+    - ".git"
+    - "vendor"
+    - "build"
+    - ".cache"
+  excluded_paths:
+    - "/home/robin/Downloads/"
+refresh_interval: 60   # Minutes
+
+detailed_stats: true
+
+# Display Statistics Settings
+display_stats:
+  show_welcome_message: true
+  show_weekly_commits: false
+  show_monthly_commits: false
+  show_total_commits: false
+  show_active_projects: true
+  show_insights: true
+  max_projects: 10
+
+  # Table Style Configuration
+  table_style:
+    show_border: true
+    column_separator: "│"
+    center_separator: "┼"
+    header_alignment: "center"  # options: left, center, right
+    show_header_line: true
+    show_row_lines: false
+    min_column_widths:
+      repository: 20
+      weekly: 8
+      streak: 8
+      changes: 13
+      activity: 10
+
+  # Activity Indicators
+  activity_indicators:
+    high_activity: "🚀"
+    normal_activity: "🔨"
+    no_activity: "⏳"
+    streak_record: "🔥"
+    active_streak: "🔥"
+
+  # Emoji Width Settings
+  use_fixed_emoji_with: true
+  fixed_emoji_width: 1
+  
+  # Activity Thresholds
+  thresholds:
+    high_activity: 20  # commits threshold for high activity
+
+  # Insight Settings
+  insight_settings:
+    top_languages_count: 3
+    show_daily_average: true
+    show_top_languages: true
+    show_peak_coding: true
+    show_weekly_summary: true
+    show_weekly_goal: true
+    show_most_active: false
+
+# Goal Settings
+goal_settings:
+  weekly_commit_goal: 30
+
+# Color Settings (hex colors)
+colors:
+  header_color: "#FF69B4"
+  section_color: "#87CEEB"
+  divider_color: "#808080"
+
+# Language Analysis Settings
+language_settings:
+  excluded_extensions:
+    - ".yaml"
+    - ".yml"
+    - ".txt"
+    - ".md"
+    - ".json"
+    - ".lock"
+    - ".gitignore"
+    - ".env"
+    - ".sum"
+    - ".mod"
+  excluded_languages:
+    - "YAML"
+    - "Text"
+    - "Markdown"
+    - "JSON"
+  minimum_lines: 10  # Ignore files with fewer than 10 lines
