@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
 
 	"github.com/AccursedGalaxy/streakode/cache"
 	"github.com/AccursedGalaxy/streakode/cmd"
@@ -35,6 +36,54 @@ func getCacheFilePath(profile string) string {
 	return filepath.Join(home, fmt.Sprintf(".streakode_%s.cache", profile))
 }
 
+func ensureCacheRefresh() error {
+	// Skip if no refresh interval is configured
+	if config.AppConfig.RefreshInterval <= 0 {
+		return nil
+	}
+
+	interval := time.Duration(config.AppConfig.RefreshInterval) * time.Minute
+	
+	// Quick check if refresh is needed
+	if cache.QuickNeedsRefresh(interval) {
+		cacheFilePath := getCacheFilePath(config.AppState.ActiveProfile)
+		
+		// For commands that need fresh data, use sync refresh
+		if requiresFreshData() {
+			return cache.RefreshCache(
+				config.AppConfig.ScanDirectories,
+				config.AppConfig.Author,
+				cacheFilePath,
+				config.AppConfig.ScanSettings.ExcludedPatterns,
+				config.AppConfig.ScanSettings.ExcludedPaths,
+			)
+		}
+		
+		// For other commands, use async refresh
+		cache.AsyncRefreshCache(
+			config.AppConfig.ScanDirectories,
+			config.AppConfig.Author,
+			cacheFilePath,
+			config.AppConfig.ScanSettings.ExcludedPatterns,
+			config.AppConfig.ScanSettings.ExcludedPaths,
+		)
+	}
+	return nil
+}
+
+func requiresFreshData() bool {
+	// Get the command being executed
+	cmd := os.Args[1]
+	
+	// List of commands that need fresh data
+	freshDataCommands := map[string]bool{
+		"stats":  true,
+		"reload": true,
+	}
+	
+	return freshDataCommands[cmd]
+}
+
 func main() {
 	var profile string
 
@@ -54,6 +103,10 @@ func main() {
 				cache.InitCache()
 				if err := cache.LoadCache(cacheFilePath); err != nil {
 					fmt.Printf("Error loading cache: %v\n", err)
+				}
+				
+				if err := ensureCacheRefresh(); err != nil {
+					fmt.Printf("Error refreshing cache: %v\n", err)
 				}
 			},
 	}
