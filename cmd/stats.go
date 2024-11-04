@@ -11,7 +11,8 @@ import (
 	"github.com/AccursedGalaxy/streakode/config"
 	"github.com/AccursedGalaxy/streakode/scan"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/olekukonko/tablewriter"
+	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/jedib0t/go-pretty/v6/text"
 )
 
 type repoInfo struct {
@@ -26,21 +27,20 @@ type repoInfo struct {
 // DisplayStats - Displays stats for all active repositories in a more compact format
 func DisplayStats() {
 	// Create a test table to calculate width
-	testBuf := new(bytes.Buffer)
-	testTable := tablewriter.NewWriter(testBuf)
-	testTable.SetHeader([]string{"Repository", "Weekly", "Streak", "Changes", "Activity"})
+	t := table.NewWriter()
+	t.AppendHeader(table.Row{"Repository", "Weekly", "Streak", "Changes", "Activity"})
 	
 	// Use configured column widths
 	cfg := config.AppConfig.DisplayStats.TableStyle.MinColumnWidths
-	testTable.SetColMinWidth(0, cfg.Repository)
-	testTable.SetColMinWidth(1, cfg.Weekly)
-	testTable.SetColMinWidth(2, cfg.Streak)
-	testTable.SetColMinWidth(3, cfg.Changes)
-	testTable.SetColMinWidth(4, cfg.Activity)
-	testTable.Render()
+	t.SetColumnConfigs([]table.ColumnConfig{
+		{Number: 1, WidthMin: cfg.Repository},
+		{Number: 2, WidthMin: cfg.Weekly},
+		{Number: 3, WidthMin: cfg.Streak},
+		{Number: 4, WidthMin: cfg.Changes},
+		{Number: 5, WidthMin: cfg.Activity},
+	})
 	
-	// Get the width from the rendered test table
-	tableWidth := len(strings.Split(testBuf.String(), "\n")[0])
+	tableWidth := len(strings.Split(t.Render(), "\n")[0])
 	
 	// Create styles with calculated width
 	style := lipgloss.NewStyle()
@@ -51,7 +51,8 @@ func DisplayStats() {
 		Align(lipgloss.Center)
 	
 	dividerStyle := style.
-		Foreground(lipgloss.Color(config.AppConfig.Colors.DividerColor))
+		Foreground(lipgloss.Color(config.AppConfig.Colors.DividerColor)).
+		Width(tableWidth)
 	
 	// Build sections dynamically
 	var sections []string
@@ -142,32 +143,52 @@ func buildProjectsSection() string {
 
 	// Create buffer for table
 	buf := new(bytes.Buffer)
-	table := tablewriter.NewWriter(buf)
+	t := table.NewWriter()
+	t.SetOutputMirror(buf)
 
-	// Configure table using config values
+	// Configure table style
 	cfg := config.AppConfig.DisplayStats.TableStyle
-	table.SetHeader([]string{"Repository", "Weekly", "Streak", "Changes", "Activity"})
-	table.SetBorder(cfg.ShowBorder)
-	table.SetColumnSeparator(cfg.ColumnSeparator)
-	table.SetCenterSeparator(cfg.CenterSeparator)
-	table.SetHeaderAlignment(getAlignment(cfg.HeaderAlignment))
-	table.SetHeaderLine(cfg.ShowHeaderLine)
-	table.SetRowLine(cfg.ShowRowLines)
-	
-	// Set configured column widths
-	table.SetColMinWidth(0, cfg.MinColumnWidths.Repository)
-	table.SetColMinWidth(1, cfg.MinColumnWidths.Weekly)
-	table.SetColMinWidth(2, cfg.MinColumnWidths.Streak)
-	table.SetColMinWidth(3, cfg.MinColumnWidths.Changes)
-	table.SetColMinWidth(4, cfg.MinColumnWidths.Activity)
+	style := table.Style{
+			Box: table.BoxStyle{
+				BottomLeft:       "└",
+				BottomRight:      "┘",
+				BottomSeparator:  "┴",
+				Left:            cfg.ColumnSeparator,
+				LeftSeparator:    "├",
+				MiddleHorizontal: "─",
+				MiddleSeparator:  cfg.CenterSeparator,
+				MiddleVertical:   cfg.ColumnSeparator,
+				PaddingLeft:      " ",
+				PaddingRight:     " ",
+				Right:           cfg.ColumnSeparator,
+				RightSeparator:   "┤",
+				TopLeft:         "┌",
+				TopRight:        "┐",
+				TopSeparator:    "┬",
+			},
+			Options: table.Options{
+				DrawBorder:      cfg.ShowBorder,
+				SeparateColumns: true,
+				SeparateHeader:  cfg.ShowHeaderLine,
+				SeparateRows:    cfg.ShowRowLines,
+			},
+		}
+	t.SetStyle(style)
 
-	// All columns centered
-	table.SetColumnAlignment([]int{
-		tablewriter.ALIGN_CENTER,
-		tablewriter.ALIGN_CENTER,
-		tablewriter.ALIGN_CENTER,
-			tablewriter.ALIGN_CENTER,
-		tablewriter.ALIGN_CENTER,
+	// Set column configs with proper alignment
+	headerAlign := text.AlignCenter
+	if cfg.HeaderAlignment == "left" {
+		headerAlign = text.AlignLeft
+	} else if cfg.HeaderAlignment == "right" {
+		headerAlign = text.AlignRight
+	}
+
+	t.SetColumnConfigs([]table.ColumnConfig{
+		{Number: 1, WidthMin: cfg.MinColumnWidths.Repository, Align: text.AlignLeft, AlignHeader: headerAlign},
+		{Number: 2, WidthMin: cfg.MinColumnWidths.Weekly, Align: text.AlignCenter, AlignHeader: headerAlign},
+		{Number: 3, WidthMin: cfg.MinColumnWidths.Streak, Align: text.AlignCenter, AlignHeader: headerAlign},
+		{Number: 4, WidthMin: cfg.MinColumnWidths.Changes, Align: text.AlignCenter, AlignHeader: headerAlign},
+		{Number: 5, WidthMin: cfg.MinColumnWidths.Activity, Align: text.AlignCenter, AlignHeader: headerAlign},
 	})
 
 	displayCount := min(len(repos), config.AppConfig.DisplayStats.MaxProjects)
@@ -200,7 +221,7 @@ func buildProjectsSection() string {
 			activityStr = fmt.Sprintf("%dd ago", int(hours/24))
 		}
 
-		// Calculate weekly changes (always use detailed format)
+		// Calculate weekly changes
 		var weeklyAdditions, weeklyDeletions int
 		weekStart := time.Now().AddDate(0, 0, -7)
 		for _, commit := range meta.CommitHistory {
@@ -211,16 +232,18 @@ func buildProjectsSection() string {
 		}
 		changesStr := fmt.Sprintf("+%d/-%d", weeklyAdditions, weeklyDeletions)
 
-		table.Append([]string{
-			padWithEmoji(activity, repo.name),
-			fmt.Sprintf("%d↑", meta.WeeklyCommits),
+		// Append row with all formatted data
+		t.AppendRow(table.Row{
+			repo.name,
+			fmt.Sprintf("%d%s", meta.WeeklyCommits, activity),
 			streakStr,
 			changesStr,
 			activityStr,
 		})
 	}
 
-	table.Render()
+	// Render to buffer and return
+	t.Render()
 	return buf.String()
 }
 
@@ -228,7 +251,7 @@ func formatLanguages(stats map[string]int, topCount int) string {
 	// Convert map to slice for sorting
 	type langStat struct {
 		lang  string
-		lines int
+			lines int
 	}
 	
 	langs := make([]langStat, 0, len(stats))
@@ -261,13 +284,29 @@ func buildInsightsSection() string {
 	insights := config.AppConfig.DisplayStats.InsightSettings
 	
 	if config.AppConfig.DetailedStats {
-		buf := new(bytes.Buffer)
-		table := tablewriter.NewWriter(buf)
-		table.SetBorder(false)
-		table.SetColumnSeparator(" ")
-		table.SetHeaderLine(false)
-		table.SetRowLine(false)
-		table.SetAutoWrapText(false)
+		t := table.NewWriter()
+		t.SetStyle(table.Style{
+			Options: table.Options{
+				DrawBorder:      false,
+				SeparateColumns: true,  // Controls column separator
+				SeparateHeader:  false, // Instead of SetHeaderLine
+				SeparateRows:    false, // Instead of SetRowLine
+			},
+			Box: table.BoxStyle{
+				PaddingLeft:      " ",
+				PaddingRight:     " ",
+				MiddleVertical:   " ", // Column separator character
+			},
+		})
+
+		// Note: AutoWrap is controlled per column via ColumnConfig if needed
+		t.SetColumnConfigs([]table.ColumnConfig{
+			{Number: 1, WidthMax: 0}, // WidthMax: 0 disables auto-wrapping
+			{Number: 2, WidthMax: 0},
+			{Number: 3, WidthMax: 0},
+			{Number: 4, WidthMax: 0},
+			{Number: 5, WidthMax: 0},
+		})
 
 		// Calculate global stats
 		totalWeeklyCommits := 0
@@ -314,7 +353,7 @@ func buildInsightsSection() string {
 
 		// Only add configured insight rows
 		if insights.ShowWeeklySummary {
-			table.Append([]string{
+			t.AppendRow(table.Row{
 				"📈",  // No padding needed for single-column emojis
 				"Weekly Summary:", 
 				fmt.Sprintf("%d commits, +%d/-%d lines", 
@@ -322,30 +361,29 @@ func buildInsightsSection() string {
 		}
 		
 		if insights.ShowDailyAverage {
-			table.Append([]string{"📊", "Daily Average:", 
+			t.AppendRow(table.Row{"📊", "Daily Average:", 
 				fmt.Sprintf("%.1f commits", float64(totalWeeklyCommits)/7.0)})
 		}
 
 		if insights.ShowTopLanguages && len(languageStats) > 0 {
 			langs := formatLanguages(languageStats, insights.TopLanguagesCount)
-			table.Append([]string{"💻", "Top Languages:", langs})
+			t.AppendRow(table.Row{"💻", "Top Languages:", langs})
 		}
 
 		if insights.ShowPeakCoding {
-			table.Append([]string{"⏰", "Peak Coding:", 
+			t.AppendRow(table.Row{"⏰", "Peak Coding:", 
 				fmt.Sprintf("%02d:00-%02d:00 (%d commits)", 
 				peakHour, (peakHour+1)%24, peakCommits)})
 		}
 
 		if insights.ShowWeeklyGoal && config.AppConfig.GoalSettings.WeeklyCommitGoal > 0 {
 			progress := float64(totalWeeklyCommits) / float64(config.AppConfig.GoalSettings.WeeklyCommitGoal) * 100
-			table.Append([]string{"🎯", "Weekly Goal:", 
+			t.AppendRow(table.Row{"🎯", "Weekly Goal:", 
 				fmt.Sprintf("%d%% (%d/%d commits)", 
 				int(progress), totalWeeklyCommits, config.AppConfig.GoalSettings.WeeklyCommitGoal)})
 		}
 
-		table.Render()
-		return buf.String()
+		return t.Render()
 	} else {
 		// Simple insights for non-detailed view
 		if insights.ShowMostActive {
@@ -364,23 +402,4 @@ func buildInsightsSection() string {
 	}
 
 	return ""
-}
-
-// Helper function to convert string alignment to tablewriter constant
-func getAlignment(alignment string) int {
-	switch strings.ToLower(alignment) {
-	case "left":
-		return tablewriter.ALIGN_LEFT
-	case "right":
-		return tablewriter.ALIGN_RIGHT
-	default:
-		return tablewriter.ALIGN_CENTER
-	}
-}
-
-// Add these new helper functions
-func padWithEmoji(emoji, text string) string {
-	// Use zero-width spaces to ensure consistent width
-	paddedEmoji := emoji + "\u200B" // Add zero-width space after emoji
-	return fmt.Sprintf("%s %s", paddedEmoji, text)
 }
