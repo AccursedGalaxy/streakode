@@ -44,6 +44,7 @@ func DisplayStats() {
 	// Build sections dynamically
 	var sections []string
 
+	// TODO: Needs to get centered above Table
 	// Header section
 	if config.AppConfig.DisplayStats.ShowWelcomeMessage {
 		header := fmt.Sprintf("🚀 %s's Coding Activity", config.AppConfig.Author)
@@ -226,7 +227,7 @@ func buildProjectsSection() string {
 		})
 	}
 
-	// TODO: integrate into user config. -- Colored styles mess with table width
+	// switch statement to check for user style setting in config
 	switch strings.ToLower(config.AppConfig.DisplayStats.TableStyle.Style) {
 	case "rounded":
 		t.SetStyle(table.StyleRounded)
