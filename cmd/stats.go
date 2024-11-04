@@ -12,7 +12,6 @@ import (
 	"github.com/AccursedGalaxy/streakode/scan"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/jedib0t/go-pretty/v6/text"
 	"golang.org/x/term"
 )
 
@@ -110,15 +109,26 @@ func buildProjectsSection() string {
 	t := table.NewWriter()
 	t.SetOutputMirror(buf)
 
-	// Get terminal width and adjust for borders
+	// Simplify width calculations
 	width, _, err := term.GetSize(0)
 	if err != nil {
 		width = 80
 	}
 	tableWidth := min(width-2, 120)
 
-	// Configure more compact table style
-	// cfg := config.AppConfig.DisplayStats.TableStyle
+	// Configure table with simpler column ratios
+	t.SetColumnConfigs([]table.ColumnConfig{
+		{Number: 1, WidthMax: int(float64(tableWidth) * 0.35)}, // Repository name
+		{Number: 2, WidthMax: int(float64(tableWidth) * 0.15)}, // Weekly commits
+		{Number: 3, WidthMax: int(float64(tableWidth) * 0.15)}, // Streak
+		{Number: 4, WidthMax: int(float64(tableWidth) * 0.20)}, // Changes
+		{Number: 5, WidthMax: int(float64(tableWidth) * 0.15)}, // Last activity
+	})
+
+	// Set overall table width
+	t.SetAllowedRowLength(tableWidth)
+
+	// Use simpler style configuration
 	style := table.Style{
 		Box: table.BoxStyle{
 			BottomLeft:       "└",
@@ -141,28 +151,10 @@ func buildProjectsSection() string {
 			DrawBorder:      true,
 			SeparateColumns: true,
 			SeparateHeader:  true,
-			SeparateRows:    false, // Disable row separators for more compact look
+			SeparateRows:    false,
 		},
 	}
 	t.SetStyle(style)
-
-	// Calculate proportional widths (accounting for padding and separators)
-	totalPadding := 10 // Account for borders and column separators
-	availableWidth := tableWidth - totalPadding
-	
-	repoWidth := int(float64(availableWidth) * 0.4)
-	weeklyWidth := int(float64(availableWidth) * 0.15)
-	streakWidth := int(float64(availableWidth) * 0.15)
-	changesWidth := int(float64(availableWidth) * 0.15)
-	activityWidth := int(float64(availableWidth) * 0.15)
-
-	t.SetColumnConfigs([]table.ColumnConfig{
-		{Number: 1, WidthMax: repoWidth, WidthMin: 10, Align: text.AlignLeft, AlignHeader: text.AlignLeft},
-		{Number: 2, WidthMax: weeklyWidth, WidthMin: 8, Align: text.AlignCenter, AlignHeader: text.AlignCenter},
-		{Number: 3, WidthMax: streakWidth, WidthMin: 8, Align: text.AlignCenter, AlignHeader: text.AlignCenter},
-		{Number: 4, WidthMax: changesWidth, WidthMin: 10, Align: text.AlignCenter, AlignHeader: text.AlignCenter},
-		{Number: 5, WidthMax: activityWidth, WidthMin: 8, Align: text.AlignCenter, AlignHeader: text.AlignCenter},
-	})
 
 	displayCount := min(len(repos), config.AppConfig.DisplayStats.MaxProjects)
 	for i := 0; i < displayCount; i++ {
