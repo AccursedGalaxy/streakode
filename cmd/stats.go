@@ -44,7 +44,7 @@ func DisplayStats() {
 	// Build sections dynamically
 	var sections []string
 
-	// TODO: Needs to get centered above Table
+	// TODO: Needs to get centered above Table - Dynamically Based On Table Width
 	// Header section
 	if config.AppConfig.DisplayStats.ShowWelcomeMessage {
 		header := fmt.Sprintf("🚀 %s's Coding Activity", config.AppConfig.Author)
