@@ -230,46 +230,73 @@ make dev
 
 ### Next To Implement 🚀
 
-#### 1. Enhanced Historical Data Collection 📊
+#### 1. **Enhanced Historical Data Collection 📊**
 
-Expanding data collection capabilities to provide deeper insights into coding patterns and productivity trends.
+   Deepen insights by tracking coding patterns, peak productivity times, and velocity trends.
 
-**Key Improvements:**
-- Track commit metadata historically for advanced analytics
-  - Upgrade Current `RepoMetadata` struct to include more data.
-  - Implement Historical data stroage using the current caching system (may need upgrades) 
-- Analyze peak coding hours and most productive days
-  - Add new functions in the scanning logic to calculte:
-    - peak coding hours - save historical snapshots
-    - most producive days
-    - coding velocity
-- Monitor velocity and metrics changes over time
-  - Allows for a more in depth and egaging stats display
+   **Key Improvements:**
+   - Track peak coding hours, productive days, and commit velocity over time.
+   - Store historical snapshots to reduce rescanning.
+   - Suggest productivity optimizations based on low-activity and high-efficiency periods.
+   - Add achievements and basic productivity suggestions.
 
-**Implementation Details:**
-1. Extend `RepoMetadata` structure:
-   - Add arrays for daily/hourly commit tracking
-   - Enable timestamp-based commit analysis
-   - Store historical snapshots to minimize repository rescanning
+---
 
-2. Velocity Trend Analysis:
-   - Calculate daily commit velocity (7/30 day averages)
-   - Compare current vs historical velocities
-   - Store metrics in new `DailyCommitData` structure
+#### 2. **Goal Tracking & Visualization 🎯**
 
-#### 2. Goal Tracking & Progress Visualization 🎯
+   Engage users with visual goal tracking and real-time progress updates.
 
-Enhance the user experience with visual progress tracking and goal management.
+   **Features:**
+   - ASCII progress bars for weekly/monthly goals.
+   - Percentage completion indicators for quick progress checks.
+   - Track goal completion history for motivation.
 
-**Planned Features:**
-- ASCII progress bars for weekly/monthly goals
-- Percentage-based completion indicators
-- Integration with user-defined goals from config
-- Real-time progress tracking against set targets
+   **Implementation:**
+   - Integrate visual indicators into `DisplayStats`.
+   - Track and display goal completion percentages in real-time.
 
-#### 3. Enhanced Profile Management 👤
+---
 
-Streamline profile management with new CLI command
+#### 3. **Enhanced Profile Management 👤**
+
+   Simplify profile switching and add preset configurations for quick setups.
+
+   **Improvements:**
+   - Preset profiles (e.g., `minimal`, `detailed`, `team-focused`).
+   - Extended `profile` command for listing and setting defaults.
+   - Dynamic config reload to apply changes without restarting.
+
+---
+
+#### 4. **Data Export and Team Reports 📈**
+
+   Allow data export and team comparison features.
+
+   **Commands:**
+   - `streakode report`: Export detailed reports (e.g., weekly/monthly).
+   - `streakode team velocity`: Compare coding velocity across team members.
+
+   **Implementation:**
+   - Add export options (Markdown, CSV).
+   - Enable optional team velocity comparison for shared repositories.
+
+---
+
+#### 5. **Team Collaboration Features 👥**
+
+   Make Streakode team-friendly by adding collaboration tools for developer groups.
+
+   **Features:**
+   - **Shared Reports**: Generate combined team reports for shared repositories.
+   - **Team Velocity Tracking**: Track each team member’s velocity and contributions to the same project.
+   - **Leaderboard**: Display a leaderboard view of team member contributions for motivation.
+   - **Group Goals**: Set shared commit goals for team projects.
+
+   **Implementation:**
+   - Introduce a `team` configuration option to specify team members and shared projects.
+   - Enhance `team velocity` to pull in data across configured team repositories.
+   - Use a shared file (e.g., JSON/CSV) to aggregate data from team members.
+   - Add privacy options to let users control visibility of their personal stats in team reports.
 
 ## License 📄
 
