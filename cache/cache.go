@@ -76,10 +76,26 @@ func NeedsRefresh(path string, lastCommit time.Time) bool {
 	return true
 }
 
+// Clean Cache
+func CleanCache(cacheFilePath string) error {
+	//Reset in-memory cache
+	Cache = make(map[string]scan.RepoMetadata)
+
+	// Remove cache file if present
+	if err := os.Remove(cacheFilePath); err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("something went wrong removing the cache file: %v", err)
+		}
+	}
+
+	return nil
+}
+
 // Modified RefreshCache to support exclusions
 func RefreshCache(dirs []string, author string, cacheFilePath string, excludedPatterns []string, excludedPaths []string) error {
-	if Cache == nil {
-		InitCache()
+	// Clean cache and handle potential errors
+	if err := CleanCache(cacheFilePath); err != nil {
+		return fmt.Errorf("failed to clean cache: %v", err)
 	}
 
 	// Create a function to check if a path should be excluded

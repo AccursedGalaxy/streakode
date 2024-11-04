@@ -68,9 +68,16 @@ func main() {
 			cmd.DisplayStats()
 		},
 	}
-	refreshCmd := &cobra.Command{
-		Use: "refresh",
-		Short: "Refresh the streakode cache",
+
+	// Define cache command and its subcommands
+	cacheCmd := &cobra.Command{
+		Use:   "cache",
+		Short: "Manage the streakode cache",
+	}
+
+	reloadCmd := &cobra.Command{
+		Use:   "reload",
+		Short: "Reload the streakode cache with fresh data",
 		Run: func(cobraCmd *cobra.Command, args []string) {
 			cacheFilePath := getCacheFilePath(profile)
 			err := cache.RefreshCache(
@@ -81,12 +88,30 @@ func main() {
 				config.AppConfig.ScanSettings.ExcludedPaths,
 			)
 			if err == nil {
-				fmt.Println("✨ Cache refreshed successfully!")
+				fmt.Println("✨ Cache reloaded successfully!")
+			} else {
+				fmt.Printf("Error reloading cache: %v\n", err)
 			}
 		},
 	}
 
-	// Add profile command
+	cleanCmd := &cobra.Command{
+		Use:   "clean",
+		Short: "Remove the streakode cache",
+		Run: func(cobraCmd *cobra.Command, args []string) {
+			cacheFilePath := getCacheFilePath(profile)
+			if err := cache.CleanCache(cacheFilePath); err != nil {
+				fmt.Printf("Error cleaning cache: %v\n", err)
+			} else {
+				fmt.Println("🧹 Cache cleaned successfully!")
+			}
+		},
+	}
+
+	// Add subcommands to cache command
+	cacheCmd.AddCommand(reloadCmd)
+	cacheCmd.AddCommand(cleanCmd)
+
 	profileCmd := &cobra.Command{
 		Use:   "profile [name]",
 		Short: "Set or show current profile",
@@ -162,7 +187,6 @@ func main() {
 		},
 	}
 
-	// Add version command
 	versionCmd := &cobra.Command{
 		Use:   "version",
 		Short: "Show streakode version",
@@ -201,8 +225,9 @@ func main() {
 		},
 	}
 
+	// Add all commands to root
 	rootCmd.AddCommand(statsCmd)
-	rootCmd.AddCommand(refreshCmd)
+	rootCmd.AddCommand(cacheCmd)
 	rootCmd.AddCommand(profileCmd)
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(authorCmd)
