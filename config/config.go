@@ -72,7 +72,26 @@ type Config struct {
 	LanguageSettings struct {
 		ExcludedExtensions []string `mapstructure:"excluded_extensions"` // e.g., [".yaml", ".txt", ".md"]
 		ExcludedLanguages  []string `mapstructure:"excluded_languages"`  // e.g., ["YAML", "Text", "Markdown"]
-		MinimumLines      int      `mapstructure:"minimum_lines"`       // Minimum lines for a language to be included
+		MinimumLines       int      `mapstructure:"minimum_lines"`       // Minimum lines for a language to be included
+		ShowDividers       bool     `mapstructure:"show_dividers"`       // Display dividers between languages in output
+	
+		LanguageDisplay struct {
+			GoDisplay     string `mapstructure:"go_display"`        // Display name/icon for Go (e.g., "🔵 Go")
+			PythonDisplay string `mapstructure:"python_display"`    // Display name/icon for Python
+			LuaDisplay    string `mapstructure:"lua_display"`       // Display name/icon for Lua
+			JavaScriptDisplay string `mapstructure:"javascript_display"` // Display name/icon for JavaScript
+			TypeScriptDisplay string `mapstructure:"typescript_display"` // Display name/icon for TypeScript
+			RustDisplay    string `mapstructure:"rust_display"`     // Display name/icon for Rust
+			CppDisplay     string `mapstructure:"cpp_display"`      // Display name/icon for C++
+			CDisplay       string `mapstructure:"c_display"`        // Display name/icon for C
+			JavaDisplay    string `mapstructure:"java_display"`     // Display name/icon for Java
+			RubyDisplay    string `mapstructure:"ruby_display"`     // Display name/icon for Ruby
+			PHPDisplay     string `mapstructure:"php_display"`      // Display name/icon for PHP
+			HTMLDisplay    string `mapstructure:"html_display"`     // Display name/icon for HTML
+			CSSDisplay     string `mapstructure:"css_display"`      // Display name/icon for CSS
+			ShellDisplay   string `mapstructure:"shell_display"`    // Display name/icon for Shell
+			DefaultDisplay string `mapstructure:"default_display"`  // Display for any unspecified language
+		} `mapstructure:"language_display"`
 	} `mapstructure:"language_settings"`
 	ShowDividers bool `mapstructure:"show_dividers"` 
 }

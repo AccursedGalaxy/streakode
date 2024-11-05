@@ -250,15 +250,35 @@ func buildProjectsSection() string {
 
 // TODO: Make Language Output Format More Appealing
 func formatLanguages(stats map[string]int, topCount int) string {
+	// Language icons mapping with more descriptive emojis
+	languageIcons := map[string]string{
+		"go":		config.AppConfig.LanguageSettings.LanguageDisplay.GoDisplay,
+		"py":		config.AppConfig.LanguageSettings.LanguageDisplay.PythonDisplay,
+		"lua":		config.AppConfig.LanguageSettings.LanguageDisplay.LuaDisplay,
+		"js":		config.AppConfig.LanguageSettings.LanguageDisplay.JavaDisplay,
+		"ts":		config.AppConfig.LanguageSettings.LanguageDisplay.TypeScriptDisplay,
+		"rust":		config.AppConfig.LanguageSettings.LanguageDisplay.RustDisplay,
+		"cpp":		config.AppConfig.LanguageSettings.LanguageDisplay.CppDisplay,
+		"c":		config.AppConfig.LanguageSettings.LanguageDisplay.CDisplay,
+		"java":		config.AppConfig.LanguageSettings.LanguageDisplay.JavaDisplay,
+		"ruby":		config.AppConfig.LanguageSettings.LanguageDisplay.RubyDisplay,
+		"php":		config.AppConfig.LanguageSettings.LanguageDisplay.PHPDisplay,
+		"html":		config.AppConfig.LanguageSettings.LanguageDisplay.HTMLDisplay,
+		"css":		config.AppConfig.LanguageSettings.LanguageDisplay.CSSDisplay,
+		"shell":	config.AppConfig.LanguageSettings.LanguageDisplay.ShellDisplay,
+		"default":	config.AppConfig.LanguageSettings.LanguageDisplay.DefaultDisplay,
+	}
+
 	// Convert map to slice for sorting
 	type langStat struct {
 		lang  string
-			lines int
+		lines int
 	}
 	
 	langs := make([]langStat, 0, len(stats))
 	for lang, lines := range stats {
-		langs = append(langs, langStat{lang, lines})
+		cleanLang := strings.ToLower(strings.TrimPrefix(lang, "."))
+		langs = append(langs, langStat{cleanLang, lines})
 	}
 	
 	// Sort by line count descending
@@ -266,16 +286,34 @@ func formatLanguages(stats map[string]int, topCount int) string {
 		return langs[i].lines > langs[j].lines
 	})
 	
-	// Format top 3 languages
+	// Format languages with icons and better number formatting
 	var formatted []string
 	for i := 0; i < min(len(langs), topCount); i++ {
 		if langs[i].lines > 0 {
-			formatted = append(formatted, fmt.Sprintf("%s:%.1fk", 
-				langs[i].lang, float64(langs[i].lines)/1000))
+			// Retrieve icon or default if not found
+			icon := languageIcons[langs[i].lang]
+			if icon == "" {
+				icon = languageIcons["default"]
+			}
+			
+			// Format lines of code with appropriate unit
+			var sizeStr string
+			switch {
+			case langs[i].lines >= 1000000:
+				sizeStr = fmt.Sprintf("%.1fM LOC", float64(langs[i].lines)/1000000)
+			case langs[i].lines >= 1000:
+				sizeStr = fmt.Sprintf("%.1fK LOC", float64(langs[i].lines)/1000)
+			default:
+				sizeStr = fmt.Sprintf("%d LOC", langs[i].lines)
+			}
+			
+			// Format with icon, language, and size
+			formatted = append(formatted, fmt.Sprintf("%s (%s)", 
+				icon, sizeStr))
 		}
 	}
 	
-	return strings.Join(formatted, ", ")
+	return strings.Join(formatted, "  ")
 }
 
 func buildInsightsSection() string {
@@ -354,13 +392,14 @@ func buildInsightsSection() string {
 			}
 		}
 
-		// Only add configured insight rows
+		// TODO: Show Comparison to last week. (Up or Down & By How Much)
 		if insights.ShowWeeklySummary {
 			t.AppendRow(table.Row{"📈", "Weekly Summary:", 
 				fmt.Sprintf("%d commits, +%d/-%d lines", 
 					totalWeeklyCommits, totalAdditions, totalDeletions)})
 		}
-		
+	
+		// TODO: Show Comparison to last weeks daily average. (Up or Down & By How Much)
 		if insights.ShowDailyAverage {
 			t.AppendRow(table.Row{"📊", "Daily Average:", 
 				fmt.Sprintf("%.1f commits", float64(totalWeeklyCommits)/7.0)})
