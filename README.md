@@ -228,75 +228,93 @@ go mod download
 make dev
 ```
 
+---
+
 ### Next To Implement 🚀
 
 #### 1. **Enhanced Historical Data Collection 📊**
 
-   Deepen insights by tracking coding patterns, peak productivity times, and velocity trends.
+   Gain deeper insights by capturing more historical data and identifying coding trends and productivity patterns.
 
    **Key Improvements:**
-   - Track peak coding hours, productive days, and commit velocity over time.
-   - Store historical snapshots to reduce rescanning.
-   - Suggest productivity optimizations based on low-activity and high-efficiency periods.
-   - Add achievements and basic productivity suggestions.
+   - Track commit velocity over time to observe productivity shifts.
+   - Provide productivity suggestions based on user-specific data trends, like identifying low-activity periods or highlighting peak productivity times.
+   - Introduce achievements for milestones and offer basic productivity tips for improvement.
 
----
 
 #### 2. **Goal Tracking & Visualization 🎯**
 
-   Engage users with visual goal tracking and real-time progress updates.
+   Boost engagement with visual goal tracking, allowing users to set, track, and achieve coding milestones.
 
    **Features:**
-   - ASCII progress bars for weekly/monthly goals.
-   - Percentage completion indicators for quick progress checks.
-   - Track goal completion history for motivation.
+   - Progress bars and indicators for weekly/monthly goals with visual feedback.
+   - Goal tracking with percentage completion to easily monitor progress.
+   - Goal completion history for motivation, tracking personal bests and progress over time.
 
    **Implementation:**
-   - Integrate visual indicators into `DisplayStats`.
-   - Track and display goal completion percentages in real-time.
+   - Integrate real-time visual indicators into `DisplayStats`.
+   - Display real-time completion percentages and progress toward goals within the command-line interface.
 
----
 
-#### 3. **Enhanced Profile Management 👤**
+#### 3. **Badge System & Milestones 🏆**
 
-   Simplify profile switching and add preset configurations for quick setups.
+   Gamify the coding experience by introducing a badge and milestone system to celebrate user accomplishments.
 
-   **Improvements:**
-   - Preset profiles (e.g., `minimal`, `detailed`, `team-focused`).
-   - Extended `profile` command for listing and setting defaults.
-   - Dynamic config reload to apply changes without restarting.
-
----
-
-#### 4. **Data Export and Team Reports 📈**
-
-   Allow data export and team comparison features.
-
-   **Commands:**
-   - `streakode report`: Export detailed reports (e.g., weekly/monthly).
-   - `streakode team velocity`: Compare coding velocity across team members.
+   **Features:**
+   - Award badges for reaching specific streaks, commit counts, and language milestones.
+   - Create a personal milestone history, encouraging users to break personal records.
+   - Adaptive difficulty that increases goal milestones based on past performance.
 
    **Implementation:**
-   - Add export options (Markdown, CSV).
-   - Enable optional team velocity comparison for shared repositories.
+   - Create a badge system with customizable icons and settings.
+   - Store milestone data to generate user-specific insights and set progressive goals.
 
----
+
+#### 4. **Detailed Language and Commit Analytics 📈**
+
+   Gain insight into code contributions by language and commit detail, making it easy to see where time and effort are spent.
+
+   **Features:**
+   - Track language-specific contributions across repositories.
+   - Display changes in contribution trends by language over time.
+   - Provide a breakdown of commit activity to help users visualize contributions in each language.
+
+   **Implementation:**
+   - Display language and commit analytics in a dedicated stats section.
+   - Track trends and breakdowns using real-time and historical data from `CommitHistory`.
+
 
 #### 5. **Team Collaboration Features 👥**
 
-   Make Streakode team-friendly by adding collaboration tools for developer groups.
+   Enhance Streakode's functionality for team settings, allowing multiple developers to track and share their progress collaboratively.
 
    **Features:**
-   - **Shared Reports**: Generate combined team reports for shared repositories.
-   - **Team Velocity Tracking**: Track each team member’s velocity and contributions to the same project.
-   - **Leaderboard**: Display a leaderboard view of team member contributions for motivation.
-   - **Group Goals**: Set shared commit goals for team projects.
+   - **Shared Reports**: Generate team reports that combine contributions across shared repositories.
+   - **Team Velocity Tracking**: Track and display each team member’s contributions and velocity on team projects.
+   - **Leaderboard**: Motivate team members with a leaderboard that highlights individual contributions.
+   - **Group Goals**: Enable teams to set and track shared commit goals for collaborative projects.
 
    **Implementation:**
-   - Introduce a `team` configuration option to specify team members and shared projects.
-   - Enhance `team velocity` to pull in data across configured team repositories.
-   - Use a shared file (e.g., JSON/CSV) to aggregate data from team members.
-   - Add privacy options to let users control visibility of their personal stats in team reports.
+   - Introduce `team` configuration with options for members and shared projects.
+   - Aggregate team member data in a shared file (e.g., JSON/CSV) to generate combined reports.
+   - Add privacy settings to let users control the visibility of their stats in team reports.
+
+
+#### 6. **Interactive CLI & Configurable Display Options 💡**
+
+   Make Streakode more interactive and customizable to suit user preferences and workflows.
+
+   **Features:**
+   - Interactive mode for exploring stats and switching between detailed views.
+   - Configurable display options to adjust table styling, width, and output verbosity.
+   - Toggleable insights and data sections, allowing users to prioritize key metrics.
+
+   **Implementation:**
+   - Develop an `interactive` command to navigate stats via CLI.
+   - Add configuration options for table styles, width, and verbosity in the `.streakodeconfig` file.
+   - Enable real-time adjustments to output detail levels for flexible display preferences.
+
+---
 
 ## License 📄
 

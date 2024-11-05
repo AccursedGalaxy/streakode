@@ -248,6 +248,7 @@ func buildProjectsSection() string {
 	return buf.String()
 }
 
+// TODO: Make Language Output Format More Appealing
 func formatLanguages(stats map[string]int, topCount int) string {
 	// Convert map to slice for sorting
 	type langStat struct {

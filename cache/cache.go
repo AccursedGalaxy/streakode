@@ -13,9 +13,6 @@ import (
 	"github.com/AccursedGalaxy/streakode/scan"
 )
 
-// TODO: rego through all the logic where we create/interact with cache, make sure we can handle version upgrades easily without issues.
-// -> Currently when a major version upgrade happens we need to manually delete cache file and do a refresh.
-
 // in-memory cache to hold repo metadata during runtime
 var (
 	Cache map[string]scan.RepoMetadata
