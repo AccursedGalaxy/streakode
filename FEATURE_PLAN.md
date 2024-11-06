@@ -6,6 +6,11 @@ This document outlines new and additional features that are planned or already i
 
 ## Next To Implement 🚀
 
+
+### Notes
+- Come up with a way to simulate commit data for various test.
+
+
 ### 1. **Enhanced Historical Data Collection 📊**
 
    Gain deeper insights by capturing more historical data and identifying coding trends and productivity patterns.

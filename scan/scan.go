@@ -51,6 +51,7 @@ type RepoMetadata struct {
 	CurrentStreak  int       `json:"current_streak"`
 	LongestStreak  int       `json:"longest_streak"`
 	WeeklyCommits  int       `json:"weekly_commits"`
+	LastWeeksCommits	int	 `json:"last_weeks_commits"`
 	MonthlyCommits int       `json:"monthly_commits"`
 	MostActiveDay  string    `json:"most_active_day"`
 	LastActivity   string    `json:"last_activity"`
@@ -92,6 +93,9 @@ func fetchRepoMeta(repoPath, author string) RepoMetadata {
 		// Quick stats that we always need
 		meta.WeeklyCommits = countRecentCommits(dates, 7)
 		meta.MonthlyCommits = countRecentCommits(dates, 30)
+
+		// Gather Commits From Last Week
+		meta.LastWeeksCommits = countLastWeeksCommits(dates)
 		
 		// Only compute streak info if the repo is active
 		if !meta.Dormant {
@@ -290,6 +294,28 @@ func calculateStreakInfo(dates []string) StreakInfo {
 	}
 
 	return StreakInfo{currentStreak, longestStreak}
+}
+
+// TODO: Get Number of Commits Last week
+func countLastWeeksCommits(dates []string) int {
+	now := time.Now()
+	endLastWeek := now.AddDate(0, 0, -7) // Goes 7 days back for "End of Last Week"
+	startLastWeek := endLastWeek.AddDate(0, 0, -7) // Goes 14 Days back for "Start of Last Week"
+
+	count := 0
+	for _, dateStr := range dates {
+		commitDate, err := time.Parse("2006-01-02 15:04:05 -0700", dateStr)
+		if err != nil {
+			continue
+		}
+	
+		// Count all commits within the time range
+		if commitDate.After(startLastWeek) && commitDate.Before(endLastWeek) {
+			count++
+		}
+	}
+
+	return count
 }
 
 // countRecentCommits - counts the number of commits in the last n days

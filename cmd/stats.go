@@ -350,6 +350,7 @@ func buildInsightsSection() string {
 
 		// Calculate global stats
 		totalWeeklyCommits := 0
+		lastWeeksCommits := 0
 		totalMonthlyCommits := 0
 		totalAdditions := 0
 		totalDeletions := 0
@@ -360,13 +361,31 @@ func buildInsightsSection() string {
 		peakHour := 0
 		peakCommits := 0
 		
+		var trendIndicator string
+		var trendText string	
+
 		for _, repo := range cache.Cache {
 			if repo.Dormant {
 				continue
 			}
 			
 			totalWeeklyCommits += repo.WeeklyCommits
+			lastWeeksCommits += repo.LastWeeksCommits
 			totalMonthlyCommits += repo.MonthlyCommits
+
+			commitDiff := totalWeeklyCommits - lastWeeksCommits
+
+			// NOTE: Possibly change Up/Down Arrow - mby via config
+			if commitDiff > 0 {
+				trendIndicator = "↗️"
+				trendText = fmt.Sprintf("up %d", commitDiff)
+			} else if commitDiff < 0 {
+				trendIndicator = "↘️"
+				trendText = fmt.Sprintf("down %d", -commitDiff)
+			} else {
+				trendIndicator = "-"
+				trendText = ""
+			}
 			
 			// Aggregate language stats
 			for lang, lines := range repo.Languages {
@@ -391,14 +410,18 @@ func buildInsightsSection() string {
 			}
 		}
 
-		// TODO: Show Comparison to last week. (Up or Down & By How Much)
 		if insights.ShowWeeklySummary {
-			t.AppendRow(table.Row{"📈", "Weekly Summary:", 
-				fmt.Sprintf("%d commits, +%d/-%d lines", 
-					totalWeeklyCommits, totalAdditions, totalDeletions)})
+			summary := fmt.Sprintf("%d commits (%s %s), +%d/-%d lines",
+			totalWeeklyCommits,
+			trendIndicator,
+			trendText,
+			totalAdditions,
+			totalDeletions)
+						
+			t.AppendRow(table.Row{"📈", "Weekly Summary:", summary})
 		}
-	
-		// TODO: Show Comparison to last weeks daily average. (Up or Down & By How Much)
+
+		// TODO: Show A Comparison To Last weeks Daily Average
 		if insights.ShowDailyAverage {
 			t.AppendRow(table.Row{"📊", "Daily Average:", 
 				fmt.Sprintf("%.1f commits", float64(totalWeeklyCommits)/7.0)})
