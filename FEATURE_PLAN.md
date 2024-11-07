@@ -6,10 +6,12 @@ This document outlines new and additional features that are planned or already i
 
 ## Next To Implement 🚀
 
+### Testing Implementation
+**Simulate Commit Data for Tests:**
+Develop a method to generate synthetic Git commit data for various testing scenarios.
+This will involve scripting the creation of mock repositories with diverse commit histories, authors, dates, and file changes.
 
-### Notes
-- Come up with a way to simulate commit data for various test.
-
+By simulating different patterns and edge cases, I can thoroughly test the CLI's functionality, performance, and robustness without relying on real repositories.
 
 ### 1. **Enhanced Historical Data Collection 📊**
 
