@@ -13,6 +13,10 @@ This will involve scripting the creation of mock repositories with diverse commi
 
 By simulating different patterns and edge cases, I can thoroughly test the CLI's functionality, performance, and robustness without relying on real repositories.
 
+**Detailed Implementation Plan:**
+See [sim_testing.md](docs/sim_testing.md) for the complete testing implementation plan and details.
+
+
 ### 1. **Enhanced Historical Data Collection 📊**
 
    Gain deeper insights by capturing more historical data and identifying coding trends and productivity patterns.
