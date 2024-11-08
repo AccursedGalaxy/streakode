@@ -1,5 +1,7 @@
 # Simulation Testing Plan for GitHub Statistics CLI 🚀
 
+Really fucking cool idea to learn about simulation testing and testing with mock data in general! helll yeaahhhh!
+
 ## Introduction
 
 As I continue to develop my CLI tool for tracking GitHub statistics, I recognize the importance of robust testing to ensure reliability and performance. To achieve this, I plan to implement a comprehensive simulation testing procedure. This will not only help me validate the functionality of my tool under various scenarios but also deepen my understanding of Go and lower-level programming concepts.
