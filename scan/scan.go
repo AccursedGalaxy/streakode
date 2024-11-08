@@ -74,6 +74,15 @@ func fetchRepoMeta(repoPath, author string) RepoMetadata {
 		Path:         repoPath,
 		LastAnalyzed: time.Now(),
 	}
+
+	// Check if directory exists and is accessible
+	if _, err := os.Stat(repoPath); os.IsNotExist(err) {
+		fmt.Printf("Warning: Directory not found: %s\n", repoPath)
+		return meta
+	} else if err != nil {
+		fmt.Printf("Warning: Cannot access directory: %s - %v\n", repoPath, err)
+		return meta
+	}
 	
 	// Get commit dates in a single git command
 	authorCmd := exec.Command("git", "-C", repoPath, "log", "--all", 
@@ -210,11 +219,14 @@ func fetchDetailedCommitInfo(repoPath string, author string, since time.Time) ([
 // ScanDirectories - scans for Git repositories in the specified directories
 func ScanDirectories(dirs []string, author string, shouldExclude func(string) bool) ([]RepoMetadata, error) {
 	var repos []RepoMetadata
+	var skippedDirs []string
 
 	for _, dir := range dirs {
 		err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+			// Handle directory access errors gracefully
 			if err != nil {
-				return err
+				skippedDirs = append(skippedDirs, dir)
+				return filepath.SkipDir
 			}
 			if info == nil {
 				return nil
@@ -233,8 +245,19 @@ func ScanDirectories(dirs []string, author string, shouldExclude func(string) bo
 			}
 			return nil
 		})
+		
+		// Handle initial directory access error
 		if err != nil {
-			return nil, fmt.Errorf("error walking directory %s: %v", dir, err)
+			skippedDirs = append(skippedDirs, dir)
+			continue // Skip to next directory instead of returning error
+		}
+	}
+
+	// Print warnings for skipped directories
+	if len(skippedDirs) > 0 {
+		fmt.Println("\nWarning: The following directories were skipped due to access issues:")
+		for _, dir := range skippedDirs {
+			fmt.Printf("- %s\n", dir)
 		}
 	}
 
