@@ -29,10 +29,10 @@ func DisplayStats() {
 	if len(tableLines) == 0 {
 		return
 	}
-	
+
 	// Get the actual table width from the first line (including borders)
 	tableWidth := len([]rune(tableLines[0])) // use runes to handle Unicode characters correctly
-	
+
 	// Create styles with calculated width - match table width exactly
 	style := lipgloss.NewStyle()
 	headerStyle := style.
@@ -40,7 +40,7 @@ func DisplayStats() {
 		Foreground(lipgloss.Color(config.AppConfig.Colors.HeaderColor)).
 		Width(tableWidth).
 		Align(lipgloss.Center)
-	
+
 	// Build sections dynamically
 	var sections []string
 
@@ -186,7 +186,7 @@ func buildProjectsSection() string {
 		// Use configured activity indicators
 		indicators := config.AppConfig.DisplayStats.ActivityIndicators
 		thresholds := config.AppConfig.DisplayStats.Thresholds
-		
+
 		activity := indicators.NormalActivity
 		if meta.WeeklyCommits > thresholds.HighActivity {
 			activity = indicators.HighActivity
@@ -273,18 +273,18 @@ func formatLanguages(stats map[string]int, topCount int) string {
 		lang  string
 		lines int
 	}
-	
+
 	langs := make([]langStat, 0, len(stats))
 	for lang, lines := range stats {
 		cleanLang := strings.ToLower(strings.TrimPrefix(lang, "."))
 		langs = append(langs, langStat{cleanLang, lines})
 	}
-	
+
 	// Sort by line count descending
 	sort.Slice(langs, func(i, j int) bool {
 		return langs[i].lines > langs[j].lines
 	})
-	
+
 	// Format languages with icons and better number formatting
 	var formatted []string
 	for i := 0; i < min(len(langs), topCount); i++ {
@@ -294,7 +294,7 @@ func formatLanguages(stats map[string]int, topCount int) string {
 			if icon == "" {
 				icon = languageIcons["default"]
 			}
-			
+
 			// Format lines of code with appropriate unit
 			var sizeStr string
 			switch {
@@ -305,13 +305,13 @@ func formatLanguages(stats map[string]int, topCount int) string {
 			default:
 				sizeStr = fmt.Sprintf("%d LOC", langs[i].lines)
 			}
-			
+
 			// Format with icon, language, and size
-			formatted = append(formatted, fmt.Sprintf("%s (%s)", 
+			formatted = append(formatted, fmt.Sprintf("%s (%s)",
 				icon, sizeStr))
 		}
 	}
-	
+
 	return strings.Join(formatted, "  ")
 }
 
@@ -328,7 +328,7 @@ func buildInsightsSection() string {
 	tableWidth := min(width-2, 120)
 
 	insights := config.AppConfig.DisplayStats.InsightSettings
-	
+
 	if config.AppConfig.DetailedStats {
 		t := table.NewWriter()
 		t.SetStyle(table.Style{
@@ -356,19 +356,19 @@ func buildInsightsSection() string {
 		totalDeletions := 0
 		languageStats := make(map[string]int)
 		hourStats := make(map[int]int)
-		
+
 		// Find peak coding hour
 		peakHour := 0
 		peakCommits := 0
-		
+
 		var trendIndicator string
-		var trendText string	
+		var trendText string
 
 		for _, repo := range cache.Cache {
 			if repo.Dormant {
 				continue
 			}
-			
+
 			totalWeeklyCommits += repo.WeeklyCommits
 			lastWeeksCommits += repo.LastWeeksCommits
 			totalMonthlyCommits += repo.MonthlyCommits
@@ -386,12 +386,12 @@ func buildInsightsSection() string {
 				trendIndicator = "-"
 				trendText = ""
 			}
-			
+
 			// Aggregate language stats
 			for lang, lines := range repo.Languages {
 				languageStats[lang] += lines
 			}
-			
+
 			// Calculate code changes and peak hours
 			weekStart := time.Now().AddDate(0, 0, -7)
 			for _, commit := range repo.CommitHistory {
@@ -400,7 +400,7 @@ func buildInsightsSection() string {
 					totalDeletions += commit.Deletions
 					hour := commit.Date.Hour()
 					hourStats[hour]++
-					
+
 					// Update peak hour
 					if hourStats[hour] > peakCommits {
 						peakHour = hour
@@ -417,13 +417,13 @@ func buildInsightsSection() string {
 			trendText,
 			totalAdditions,
 			totalDeletions)
-						
+
 			t.AppendRow(table.Row{"📈", "Weekly Summary:", summary})
 		}
 
 		// TODO: Show A Comparison To Last weeks Daily Average
 		if insights.ShowDailyAverage {
-			t.AppendRow(table.Row{"📊", "Daily Average:", 
+			t.AppendRow(table.Row{"📊", "Daily Average:",
 				fmt.Sprintf("%.1f commits", float64(totalWeeklyCommits)/7.0)})
 		}
 
@@ -433,15 +433,15 @@ func buildInsightsSection() string {
 		}
 
 		if insights.ShowPeakCoding {
-			t.AppendRow(table.Row{"⏰", "Peak Coding:", 
-				fmt.Sprintf("%02d:00-%02d:00 (%d commits)", 
+			t.AppendRow(table.Row{"⏰", "Peak Coding:",
+				fmt.Sprintf("%02d:00-%02d:00 (%d commits)",
 				peakHour, (peakHour+1)%24, peakCommits)})
 		}
 
 		if insights.ShowWeeklyGoal && config.AppConfig.GoalSettings.WeeklyCommitGoal > 0 {
 			progress := float64(totalWeeklyCommits) / float64(config.AppConfig.GoalSettings.WeeklyCommitGoal) * 100
-			t.AppendRow(table.Row{"🎯", "Weekly Goal:", 
-				fmt.Sprintf("%d%% (%d/%d commits)", 
+			t.AppendRow(table.Row{"🎯", "Weekly Goal:",
+				fmt.Sprintf("%d%% (%d/%d commits)",
 				int(progress), totalWeeklyCommits, config.AppConfig.GoalSettings.WeeklyCommitGoal)})
 		}
 

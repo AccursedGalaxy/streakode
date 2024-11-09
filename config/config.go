@@ -74,7 +74,7 @@ type Config struct {
 		ExcludedLanguages  []string `mapstructure:"excluded_languages"`  // e.g., ["YAML", "Text", "Markdown"]
 		MinimumLines       int      `mapstructure:"minimum_lines"`       // Minimum lines for a language to be included
 		ShowDividers       bool     `mapstructure:"show_dividers"`       // Display dividers between languages in output
-	
+
 		LanguageDisplay struct {
 			GoDisplay     string `mapstructure:"go_display"`        // Display name/icon for Go (e.g., "🔵 Go")
 			PythonDisplay string `mapstructure:"python_display"`    // Display name/icon for Python
@@ -93,7 +93,7 @@ type Config struct {
 			DefaultDisplay string `mapstructure:"default_display"`  // Display for any unspecified language
 		} `mapstructure:"language_display"`
 	} `mapstructure:"language_settings"`
-	ShowDividers bool `mapstructure:"show_dividers"` 
+	ShowDividers bool `mapstructure:"show_dividers"`
 }
 
 type State struct {
@@ -196,13 +196,13 @@ func SaveState() error {
 	if err != nil {
 		return err
 	}
-	
+
 	stateFile := filepath.Join(home, ".streakode.state")
 	data, err := json.Marshal(AppState)
 	if err != nil {
 		return err
 	}
-	
+
 	return os.WriteFile(stateFile, data, 0644)
 }
 
@@ -211,7 +211,7 @@ func LoadState() error {
 	if err != nil {
 		return err
 	}
-	
+
 	stateFile := filepath.Join(home, ".streakode.state")
 	data, err := os.ReadFile(stateFile)
 	if err != nil {
@@ -221,7 +221,7 @@ func LoadState() error {
 		}
 		return err
 	}
-	
+
 	return json.Unmarshal(data, &AppState)
 }
 

@@ -208,15 +208,15 @@ func AsyncRefreshCache(dirs []string, author string, cacheFilePath string, exclu
 func QuickNeedsRefresh(refreshInterval time.Duration) bool {
 	mutex.RLock()
 	defer mutex.RUnlock()
-	
+
 	if metadata.LastRefresh.IsZero() {
 		return true
 	}
-	
+
 	// Check if cache file exists and its modification time
 	if time.Since(metadata.LastRefresh) > refreshInterval {
 		return true
 	}
-	
+
 	return false
 }
