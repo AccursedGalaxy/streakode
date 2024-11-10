@@ -38,6 +38,16 @@ type CommitTrend struct {
     text        string
 }
 
+type LanguageStats map[string]int
+type HourStats map[int]int
+
+const (
+    defaultTerminalWidth = 80
+    maxTableWidth = 120
+    hoursInDay = 24
+    daysInWeek = 7
+)
+
 func calculateCommitTrend(current int, previous int) CommitTrend {
     diff := current - previous
     switch {
@@ -164,9 +174,9 @@ func buildProjectsSection() string {
 	// Width calculations
 	width, _, err := term.GetSize(0)
 	if err != nil {
-		width = 80
+		width = defaultTerminalWidth
 	}
-	tableWidth := min(width-2, 120)
+	tableWidth := min(width-2,maxTableWidth)
 
 	// Configure table with column ratios
 	t.SetColumnConfigs([]table.ColumnConfig{
@@ -206,13 +216,13 @@ func buildProjectsSection() string {
 
 		// Format activity
 		activityStr := "today"
-		if hours := time.Since(repo.lastCommit).Hours(); hours > 24 {
-			activityStr = fmt.Sprintf("%dd ago", int(hours/24))
+		if hours := time.Since(repo.lastCommit).Hours(); hours > hoursInDay {
+			activityStr = fmt.Sprintf("%dd ago", int(hours/hoursInDay))
 		}
 
 		// Calculate weekly changes
 		var weeklyAdditions, weeklyDeletions int
-		weekStart := time.Now().AddDate(0, 0, -7)
+		weekStart := time.Now().AddDate(0, 0, -daysInWeek)
 		for _, commit := range meta.CommitHistory {
 			if commit.Date.After(weekStart) {
 				weeklyAdditions += commit.Additions
@@ -355,9 +365,9 @@ func buildInsightsSection() string {
 	// Get the same terminal width as used elsewhere
 	width, _, err := term.GetSize(0)
 	if err != nil {
-		width = 80
+		width = defaultTerminalWidth
 	}
-	tableWidth := min(width-2, 120)
+	tableWidth := min(width-2, maxTableWidth)
 
 	insights := config.AppConfig.DisplayStats.InsightSettings
 
@@ -394,7 +404,7 @@ func buildInsightsSection() string {
 			totalMonthlyCommits += repo.MonthlyCommits
 
             // Calculate code changes and peak hours
-			weekStart := time.Now().AddDate(0, 0, -7)
+			weekStart := time.Now().AddDate(0, 0, -daysInWeek)
 			for _, commit := range repo.CommitHistory {
 				if commit.Date.After(weekStart) {
 					totalAdditions += commit.Additions
@@ -428,7 +438,7 @@ func buildInsightsSection() string {
         // NOTE: Possibly Show A Comparison To Last weeks Daily Average
 		if insights.ShowDailyAverage {
 			t.AppendRow(table.Row{"📊", "Daily Average:",
-				fmt.Sprintf("%.1f commits", float64(totalWeeklyCommits)/7.0)})
+				fmt.Sprintf("%.1f commits", float64(totalWeeklyCommits)/daysInWeek)})
 		}
 
 		if insights.ShowTopLanguages && len(languageStats) > 0 {
@@ -439,7 +449,7 @@ func buildInsightsSection() string {
 		if insights.ShowPeakCoding {
 			t.AppendRow(table.Row{"⏰", "Peak Coding:",
 				fmt.Sprintf("%02d:00-%02d:00 (%d commits)",
-				peakHour, (peakHour+1)%24, peakCommits)})
+				peakHour, (peakHour+1)%hoursInDay, peakCommits)})
 		}
 
 		if insights.ShowWeeklyGoal && config.AppConfig.GoalSettings.WeeklyCommitGoal > 0 {
