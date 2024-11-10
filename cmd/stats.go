@@ -271,11 +271,11 @@ func formatLanguages(stats map[string]int, topCount int) string {
 			var sizeStr string
 			switch {
 			case langs[i].lines >= 1000000:
-				sizeStr = fmt.Sprintf("%.1fM LOC", float64(langs[i].lines)/1000000)
+				sizeStr = fmt.Sprintf("%.1fM", float64(langs[i].lines)/1000000)
 			case langs[i].lines >= 1000:
-				sizeStr = fmt.Sprintf("%.1fK LOC", float64(langs[i].lines)/1000)
+				sizeStr = fmt.Sprintf("%.1fK", float64(langs[i].lines)/1000)
 			default:
-				sizeStr = fmt.Sprintf("%d LOC", langs[i].lines)
+				sizeStr = fmt.Sprintf("%d", langs[i].lines)
 			}
 
 			// Format with icon, language, and size
@@ -303,6 +303,17 @@ func getTableStyle() table.Style {
     }
 }
 
+func processLanguageStats(cache map[string]scan.RepoMetadata) map[string]int {
+    languageStats := make(map[string]int)
+
+    for _, repo := range cache {
+        for lang, lines := range repo.Languages {
+            languageStats[lang] += lines
+        }
+    }
+
+    return languageStats
+}
 
 func buildInsightsSection() string {
 	if !config.AppConfig.DisplayStats.ShowInsights {
@@ -331,7 +342,6 @@ func buildInsightsSection() string {
 		totalMonthlyCommits := 0
 		totalAdditions := 0
 		totalDeletions := 0
-		languageStats := make(map[string]int)
 		hourStats := make(map[int]int)
 
 		// Find peak coding hour
@@ -340,6 +350,10 @@ func buildInsightsSection() string {
 
 		var trendIndicator string
 		var trendText string
+
+        // Aggregate language stats
+        languageStats := processLanguageStats(cache.Cache)
+
 
 		for _, repo := range cache.Cache {
 			if repo.Dormant {
@@ -364,12 +378,7 @@ func buildInsightsSection() string {
 				trendText = ""
 			}
 
-			// Aggregate language stats
-			for lang, lines := range repo.Languages {
-				languageStats[lang] += lines
-			}
-
-			// Calculate code changes and peak hours
+            // Calculate code changes and peak hours
 			weekStart := time.Now().AddDate(0, 0, -7)
 			for _, commit := range repo.CommitHistory {
 				if commit.Date.After(weekStart) {
