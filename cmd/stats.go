@@ -22,7 +22,6 @@ TODO::
 Testing Stuff:
 - [ ] Create unit tests for calculation logic
 - [ ] Consider using interfaces for better testing
-- [ ] Add validation for config values
 */
 
 type repoInfo struct {
@@ -434,11 +433,11 @@ func buildInsightsSection() string {
         // Get Commit Trend
         commitTrend := calculateCommitTrend(totalWeeklyCommits, lastWeeksCommits)
 
-        // NOTE: %s get's formatted with {} instead of () - possibly need to fix
 		if insights.ShowWeeklySummary {
-			summary := fmt.Sprintf("%d commits, %s +%d/-%d lines",
+			summary := fmt.Sprintf("%d commits (%s %s), +%d/-%d lines",
 			totalWeeklyCommits,
-            commitTrend,
+            commitTrend.indicator,
+            commitTrend.text,
 			totalAdditions,
 			totalDeletions)
 
