@@ -344,7 +344,6 @@ func getTableStyle() table.Style {
             SeparateHeader: config.AppConfig.DisplayStats.TableStyle.Options.SeparateHeader,
             SeparateRows:   config.AppConfig.DisplayStats.TableStyle.Options.SeparateRows,
         },
-        // TODO: Make this configurable
         Box: table.BoxStyle{
             PaddingLeft:  "",
             PaddingRight: " ",
