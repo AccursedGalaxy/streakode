@@ -6,7 +6,9 @@
 
 Streakode is a powerful Git activity tracker that helps developers monitor their coding streaks, commit patterns, and project engagement. It provides insightful statistics about your coding habits across multiple repositories, with support for different profiles (e.g., work and personal projects).
 
-![Streakode Preview](images/preview.png)
+<div align="center">
+  <img src="images/preview.png" alt="Streakode Preview" width="600">
+</div>
 
 ## Features ✨
 
