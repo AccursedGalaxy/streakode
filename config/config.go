@@ -28,13 +28,6 @@ type Config struct {
 		TableStyle struct {
 			UseTableHeader 	bool 		`mapstructure:"use_table_header"`
 			Style			string		`mapstructure:"style"`
-			MinColumnWidths   struct {
-				Repository int `mapstructure:"repository"`
-				Weekly    int `mapstructure:"weekly"`
-				Streak    int `mapstructure:"streak"`
-				Changes   int `mapstructure:"changes"`
-				Activity  int `mapstructure:"activity"`
-			} `mapstructure:"min_column_widths"`
 			Options struct {
 				DrawBorder	bool	`mapstructure:"draw_border"`
 				SeparateColumns bool	`mapstructure:"separate_columns"`
@@ -130,23 +123,6 @@ func (c *Config) ValidateConfig() error {
 	// Validate colors (optional - can remove this to allow empty colors)
 	if c.Colors.HeaderColor == "" {
 		c.Colors.HeaderColor = "#FF69B4"
-	}
-
-	// Validate table style
-	if c.DisplayStats.TableStyle.MinColumnWidths.Repository < 10 {
-		c.DisplayStats.TableStyle.MinColumnWidths.Repository = 20
-	}
-	if c.DisplayStats.TableStyle.MinColumnWidths.Weekly < 5 {
-		c.DisplayStats.TableStyle.MinColumnWidths.Weekly = 8
-	}
-	if c.DisplayStats.TableStyle.MinColumnWidths.Streak < 5 {
-		c.DisplayStats.TableStyle.MinColumnWidths.Streak = 8
-	}
-	if c.DisplayStats.TableStyle.MinColumnWidths.Changes < 8 {
-		c.DisplayStats.TableStyle.MinColumnWidths.Changes = 13
-	}
-	if c.DisplayStats.TableStyle.MinColumnWidths.Activity < 5 {
-		c.DisplayStats.TableStyle.MinColumnWidths.Activity = 10
 	}
 
 	// Set default activity indicators if not specified
