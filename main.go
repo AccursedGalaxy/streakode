@@ -10,8 +10,10 @@ import (
 	"github.com/AccursedGalaxy/streakode/cache"
 	"github.com/AccursedGalaxy/streakode/cmd"
 	"github.com/AccursedGalaxy/streakode/config"
+    "github.com/rhysd/go-github-selfupdate/selfupdate"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+    "github.com/blang/semver"
 )
 
 var Version = "dev" // This will be overwritten during build
@@ -248,6 +250,48 @@ func main() {
 		},
 	}
 
+	// Add a command to check for updates
+	updateCmd := &cobra.Command{
+		Use:   "update",
+		Short: "Check for updates and apply if available",
+		Run: func(cobraCmd *cobra.Command, args []string) {
+			updater, err := selfupdate.NewUpdater(selfupdate.Config{})
+			if err != nil {
+				fmt.Printf("Error initializing updater: %v\n", err)
+				return
+			}
+			repo := "AccursedGalaxy/streakode" // Your GitHub repo
+
+			latest, found, err := updater.DetectLatest(repo)
+			if err != nil {
+				fmt.Printf("Error checking for updates: %v\n", err)
+				return
+			}
+
+			// Parse the current version
+			currentVersion, err := semver.ParseTolerant(Version)
+			if err != nil {
+				fmt.Printf("Error parsing current version: %v\n", err)
+				return
+			}
+
+			// Compare the current version with the latest version
+			if !found || latest.Version.LTE(currentVersion) {
+				fmt.Println("You are already using the latest version.")
+				return
+			}
+
+			fmt.Printf("New version %s is available. Updating...\n", latest.Version)
+			if err := updater.UpdateTo(latest, os.Args[0]); err != nil {
+				fmt.Printf("Error updating to the latest version: %v\n", err)
+				return
+			}
+
+			fmt.Println("Update successful!")
+            fmt.Printf("Release notes: %s\n", latest.ReleaseNotes)
+		},
+	}
+
 	authorCmd := &cobra.Command{
 		Use:   "author",
 		Short: "Show configured Git author information",
@@ -283,6 +327,7 @@ func main() {
 	rootCmd.AddCommand(cacheCmd)
 	rootCmd.AddCommand(profileCmd)
 	rootCmd.AddCommand(versionCmd)
+    rootCmd.AddCommand(updateCmd)
 	rootCmd.AddCommand(authorCmd)
 	rootCmd.Execute()
 }
