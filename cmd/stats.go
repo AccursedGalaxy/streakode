@@ -287,6 +287,23 @@ func formatLanguages(stats map[string]int, topCount int) string {
 	return strings.Join(formatted, "  ")
 }
 
+func getTableStyle() table.Style {
+    return table.Style{
+        Options: table.Options{
+            DrawBorder:     config.AppConfig.DisplayStats.TableStyle.Options.DrawBorder,
+            SeparateColumns: config.AppConfig.DisplayStats.TableStyle.Options.SeparateColumns,
+            SeparateHeader: config.AppConfig.DisplayStats.TableStyle.Options.SeparateHeader,
+            SeparateRows:   config.AppConfig.DisplayStats.TableStyle.Options.SeparateRows,
+        },
+        Box: table.BoxStyle{
+            PaddingLeft:  "",
+            PaddingRight: " ",
+            MiddleVertical: "",
+        },
+    }
+}
+
+
 func buildInsightsSection() string {
 	if !config.AppConfig.DisplayStats.ShowInsights {
 		return ""
@@ -303,19 +320,7 @@ func buildInsightsSection() string {
 
 	if config.AppConfig.DetailedStats {
 		t := table.NewWriter()
-		t.SetStyle(table.Style{
-			Options: table.Options{
-				DrawBorder:      config.AppConfig.DisplayStats.TableStyle.Options.DrawBorder,
-				SeparateColumns: config.AppConfig.DisplayStats.TableStyle.Options.SeparateColumns,
-				SeparateHeader:  config.AppConfig.DisplayStats.TableStyle.Options.SeparateHeader,
-				SeparateRows:    config.AppConfig.DisplayStats.TableStyle.Options.SeparateRows,
-			},
-			Box: table.BoxStyle{
-				PaddingLeft:      "",
-				PaddingRight:     " ",
-				MiddleVertical:   "",
-			},
-		})
+        t.SetStyle(getTableStyle())
 
 		// Set max width for the entire table
 		t.SetAllowedRowLength(tableWidth-2)
