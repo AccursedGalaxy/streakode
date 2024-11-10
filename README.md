@@ -182,6 +182,7 @@ Or if you cloned the repository, you can pull the latest changes and build the p
 ```bash
 git pull
 make clean
+make build
 make install
 ```
 
