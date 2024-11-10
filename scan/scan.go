@@ -68,6 +68,15 @@ type RepoMetadata struct {
 
 }
 
+/*
+TODO:
+- Rethink Time Management.
+-> Currently we are just going 7 days back for last week and 24 hours back for last day, etc.
+-> We should consider switching to a more date-based approach.
+--> This would allow for a more "real" way of displaying the output.
+--> Also, might make more sense from a user perspective.
+*/
+
 // fetchRepoMeta - gets metadata for a single repository and verifies user
 func fetchRepoMeta(repoPath, author string) RepoMetadata {
 	meta := RepoMetadata{
@@ -83,29 +92,29 @@ func fetchRepoMeta(repoPath, author string) RepoMetadata {
 		fmt.Printf("Warning: Cannot access directory: %s - %v\n", repoPath, err)
 		return meta
 	}
-	
+
 	// Get commit dates in a single git command
-	authorCmd := exec.Command("git", "-C", repoPath, "log", "--all", 
+	authorCmd := exec.Command("git", "-C", repoPath, "log", "--all",
 		"--author="+author, "--pretty=format:%ci")
 	output, err := authorCmd.Output()
 	if err == nil && len(output) > 0 {
 		meta.AuthorVerified = true
 		dates := strings.Split(string(output), "\n")
 		meta.CommitCount = len(dates)
-		
+
 		// Parse first date for last commit
 		if lastCommitTime, err := time.Parse("2006-01-02 15:04:05 -0700", dates[0]); err == nil {
 			meta.LastCommit = lastCommitTime
 			meta.Dormant = time.Since(meta.LastCommit) > time.Duration(config.AppConfig.DormantThreshold) * 24 * time.Hour
 		}
-		
+
 		// Quick stats that we always need
 		meta.WeeklyCommits = countRecentCommits(dates, 7)
 		meta.MonthlyCommits = countRecentCommits(dates, 30)
 
 		// Gather Commits From Last Week
 		meta.LastWeeksCommits = countLastWeeksCommits(dates)
-		
+
 		// Only compute streak info if the repo is active
 		if !meta.Dormant {
 			streakInfo := calculateStreakInfo(dates)
@@ -135,7 +144,7 @@ func (m *RepoMetadata) initDetailedStats() {
 
 func (m *RepoMetadata) updateDetailedStats(repoPath, author string) {
 	since := time.Now().AddDate(0, 0, -30) // Only fetch last 30 days for detailed stats
-	
+
 	// Fetch commit history
 	if history, err := fetchDetailedCommitInfo(repoPath, author, since); err == nil {
 		m.CommitHistory = history
@@ -146,7 +155,7 @@ func (m *RepoMetadata) updateDetailedStats(repoPath, author string) {
 	// Fetch language statistics
 	if languages, err := fetchLanguageStats(repoPath); err == nil {
 		m.Languages = languages
-		
+
 		// Calculate total lines across all languages
 		totalLines := 0
 		for _, lines := range languages {
@@ -160,7 +169,7 @@ func (m *RepoMetadata) updateDetailedStats(repoPath, author string) {
 
 func fetchDetailedCommitInfo(repoPath string, author string, since time.Time) ([]CommitHistory, error) {
     var history []CommitHistory
-    
+
     // Get detailed git log with stats
     gitCmd := exec.Command("git", "-C", repoPath, "log",
         "--all",
@@ -168,9 +177,9 @@ func fetchDetailedCommitInfo(repoPath string, author string, since time.Time) ([
         "--pretty=format:%H|%aI|%s",
         "--numstat",
         "--after="+since.Format("2006-01-02"))
-    
+
     // fmt.Printf("Debug - Running git command: %v\n", gitCmd.String())
-    
+
     output, err := gitCmd.Output()
     if err != nil {
         return nil, fmt.Errorf("git command failed: %v", err)
@@ -179,7 +188,7 @@ func fetchDetailedCommitInfo(repoPath string, author string, since time.Time) ([
     // Parse the git log output
     lines := strings.Split(string(output), "\n")
     var currentCommit *CommitHistory
-    
+
     for _, line := range lines {
         if strings.Contains(line, "|") {
             // This is a commit header line
@@ -188,7 +197,7 @@ func fetchDetailedCommitInfo(repoPath string, author string, since time.Time) ([
                 if currentCommit != nil {
                     history = append(history, *currentCommit)
                 }
-                
+
                 commitTime, _ := time.Parse(time.RFC3339, parts[1])
                 currentCommit = &CommitHistory{
                     Hash:        parts[0],
@@ -208,11 +217,11 @@ func fetchDetailedCommitInfo(repoPath string, author string, since time.Time) ([
             }
         }
     }
-    
+
     if currentCommit != nil {
         history = append(history, *currentCommit)
     }
-    
+
     return history, nil
 }
 
@@ -245,7 +254,7 @@ func ScanDirectories(dirs []string, author string, shouldExclude func(string) bo
 			}
 			return nil
 		})
-		
+
 		// Handle initial directory access error
 		if err != nil {
 			skippedDirs = append(skippedDirs, dir)
@@ -331,7 +340,7 @@ func countLastWeeksCommits(dates []string) int {
 		if err != nil {
 			continue
 		}
-	
+
 		// Count all commits within the time range
 		if commitDate.After(startLastWeek) && commitDate.Before(endLastWeek) {
 			count++
@@ -345,14 +354,14 @@ func countLastWeeksCommits(dates []string) int {
 func countRecentCommits(dates []string, days int) int {
 	now := time.Now()
 	cutoff := now.AddDate(0, 0, -days)
-	
+
 	count := 0
 	for _, dateStr := range dates {
 		commitDate, err := time.Parse("2006-01-02 15:04:05 -0700", dateStr)
 		if err != nil {
 			continue
 		}
-		
+
 		// Count all commits within the time range
 		if commitDate.After(cutoff) && commitDate.Before(now) {
 			count++
@@ -387,26 +396,26 @@ func findMostActiveDay(dates []string) string {
 
 func fetchLanguageStats(repoPath string) (map[string]int, error) {
 	languages := make(map[string]int)
-	
+
 	// Use git ls-files to get all tracked files
 	cmd := exec.Command("git", "-C", repoPath, "ls-files")
 	output, err := cmd.Output()
 	if err != nil {
 		return languages, fmt.Errorf("git ls-files failed: %v", err)
 	}
-	
+
 	files := strings.Split(string(output), "\n")
 	for _, file := range files {
 		if file == "" {
 			continue
 		}
-		
+
 		if ext := filepath.Ext(file); ext != "" {
 			// Skip excluded extensions
 			if isExcludedExtension(ext) {
 				continue
 			}
-			
+
 			// Count lines in file
 			fullPath := filepath.Join(repoPath, file)
 			if lines, err := countFileLines(fullPath); err == nil {
@@ -417,7 +426,7 @@ func fetchLanguageStats(repoPath string) (map[string]int, error) {
 			}
 		}
 	}
-	
+
 	return languages, nil
 }
 
@@ -445,7 +454,7 @@ func countFileLines(filePath string) (int, error) {
 func (m *RepoMetadata) GetCommitTrend(days int) map[string]int {
     trend := make(map[string]int)
     since := time.Now().AddDate(0, 0, -days)
-    
+
     for _, commit := range m.CommitHistory {
         if commit.Date.After(since) {
             dateStr := commit.Date.Format("2006-01-02")
@@ -458,14 +467,14 @@ func (m *RepoMetadata) GetCommitTrend(days int) map[string]int {
 func (m *RepoMetadata) GetLanguageDistribution() map[string]float64 {
     total := 0
     dist := make(map[string]float64)
-    
+
     // Calculate total excluding unwanted languages
     for lang, lines := range m.Languages {
         if !isExcludedExtension(lang) {
             total += lines
         }
     }
-    
+
     if total > 0 {
         for lang, lines := range m.Languages {
             if !isExcludedExtension(lang) {
@@ -473,18 +482,18 @@ func (m *RepoMetadata) GetLanguageDistribution() map[string]float64 {
             }
         }
     }
-    
+
     return dist
 }
 
 func (m *RepoMetadata) CalculatePeakHours() []TimeSlot {
     hourStats := make(map[int]*TimeSlot)
-    
+
     // Initialize all hours
     for i := 0; i < 24; i++ {
         hourStats[i] = &TimeSlot{Hour: i}
     }
-    
+
     // Aggregate commit data by hour
     for _, commit := range m.CommitHistory {
         hour := commit.Date.Hour()
@@ -492,18 +501,18 @@ func (m *RepoMetadata) CalculatePeakHours() []TimeSlot {
         slot.Commits++
         slot.Lines += commit.Additions + commit.Deletions
     }
-    
+
     // Convert to slice and sort by commit count
     peaks := make([]TimeSlot, 0, 24)
     for _, slot := range hourStats {
         peaks = append(peaks, *slot)
     }
-    
+
     // Sort by commit count descending
     sort.Slice(peaks, func(i, j int) bool {
         return peaks[i].Commits > peaks[j].Commits
     })
-    
+
     // Return top 5 peak hours
     if len(peaks) > 5 {
         return peaks[:5]
@@ -514,7 +523,7 @@ func (m *RepoMetadata) CalculatePeakHours() []TimeSlot {
 func (m *RepoMetadata) CalculateVelocity() VelocityMetrics {
     now := time.Now()
     metrics := VelocityMetrics{}
-    
+
     // Calculate daily average (last 30 days)
     thirtyDaysAgo := now.AddDate(0, 0, -30)
     recentCommits := 0
@@ -524,24 +533,24 @@ func (m *RepoMetadata) CalculateVelocity() VelocityMetrics {
         }
     }
     metrics.DailyAverage = float64(recentCommits) / 30.0
-    
+
     // Calculate weekly trend
     currentWeek := countCommitsInPeriod(m.CommitHistory, now.AddDate(0, 0, -7), now)
     previousWeek := countCommitsInPeriod(m.CommitHistory, now.AddDate(0, 0, -14), now.AddDate(0, 0, -7))
     if previousWeek > 0 {
         metrics.WeeklyTrend = (float64(currentWeek) - float64(previousWeek)) / float64(previousWeek) * 100
     }
-    
+
     // Calculate monthly trend
     currentMonth := countCommitsInPeriod(m.CommitHistory, now.AddDate(0, -1, 0), now)
     previousMonth := countCommitsInPeriod(m.CommitHistory, now.AddDate(0, -2, 0), now.AddDate(0, -1, 0))
     if previousMonth > 0 {
         metrics.MonthlyTrend = (float64(currentMonth) - float64(previousMonth)) / float64(previousMonth) * 100
     }
-    
+
     // Calculate peak hours
     metrics.PeakHours = m.CalculatePeakHours()
-    
+
     return metrics
 }
 
