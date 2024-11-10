@@ -21,6 +21,23 @@ type repoInfo struct {
     lastCommit time.Time
 }
 
+type CommitTrend struct {
+    indicator   string
+    text        string
+}
+
+func calculateCommitTrend(current int, previous int) CommitTrend {
+    diff := current - previous
+    switch {
+    case diff > 0:
+        return CommitTrend{"↗️", fmt.Sprintf("up %d", diff)}
+    case diff < 0:
+        return CommitTrend{"↘️", fmt.Sprintf("down %d", -diff)}
+    default:
+        return CommitTrend{"-", ""}
+    }
+}
+
 // DisplayStats - Displays stats for all active repositories in a more compact format
 func DisplayStats() {
 	// Get table width from the rendered table first
@@ -348,9 +365,6 @@ func buildInsightsSection() string {
 		peakHour := 0
 		peakCommits := 0
 
-		var trendIndicator string
-		var trendText string
-
         // Aggregate language stats
         languageStats := processLanguageStats(cache.Cache)
 
@@ -363,20 +377,6 @@ func buildInsightsSection() string {
 			totalWeeklyCommits += repo.WeeklyCommits
 			lastWeeksCommits += repo.LastWeeksCommits
 			totalMonthlyCommits += repo.MonthlyCommits
-
-			commitDiff := totalWeeklyCommits - lastWeeksCommits
-
-			// NOTE: Possibly change Up/Down Arrow - mby via config
-			if commitDiff > 0 {
-				trendIndicator = "↗️"
-				trendText = fmt.Sprintf("up %d", commitDiff)
-			} else if commitDiff < 0 {
-				trendIndicator = "↘️"
-				trendText = fmt.Sprintf("down %d", -commitDiff)
-			} else {
-				trendIndicator = "-"
-				trendText = ""
-			}
 
             // Calculate code changes and peak hours
 			weekStart := time.Now().AddDate(0, 0, -7)
@@ -396,11 +396,14 @@ func buildInsightsSection() string {
 			}
 		}
 
+        // Get Commit Trend
+        commitTrend := calculateCommitTrend(totalWeeklyCommits, lastWeeksCommits)
+
+        // NOTE: %s get's formatted with {} instead of () - possibly need to fix
 		if insights.ShowWeeklySummary {
-			summary := fmt.Sprintf("%d commits (%s %s), +%d/-%d lines",
+			summary := fmt.Sprintf("%d commits, %s +%d/-%d lines",
 			totalWeeklyCommits,
-			trendIndicator,
-			trendText,
+            commitTrend,
 			totalAdditions,
 			totalDeletions)
 
