@@ -1,4 +1,4 @@
-.PHONY: build install clean test release dev-release
+.PHONY: build install clean test release dev-release downgrade
 
 # Get the latest git tag
 VERSION := $(shell git describe --tags --abbrev=0 2>/dev/null || echo "dev")
@@ -49,3 +49,9 @@ release:
 	GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o dist/streakode-darwin-arm64
 	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o dist/streakode-linux-amd64
 	GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o dist/streakode-windows-amd64.exe
+
+# Downgrade to version 1.5.4
+downgrade:
+	@git checkout tags/v1.5.4
+	@make build
+	@echo "Downgraded to version 1.5.4. Please run 'make install' to apply the changes."
