@@ -16,8 +16,8 @@ import (
 )
 
 /*
-General TODOs:
-- [ ] Pre-Allocate Memory for Slices
+TODO::
+- [X] Pre-Allocate Memory for Slices
 
 Testing Stuff:
 - [ ] Create unit tests for calculation logic
@@ -299,8 +299,16 @@ func formatLanguages(stats map[string]int, topCount int) string {
 		return langs[i].lines > langs[j].lines
 	})
 
+    // Calculate size needed for formatted slice
+    size := 0
+    for i := 0; i < min(len(langs), topCount); i++ {
+        if langs[i].lines > 0 {
+            size++
+        }
+    }
+
 	// Format languages with icons and better number formatting
-	var formatted []string
+    formatted := make([]string, 0, size)
 	for i := 0; i < min(len(langs), topCount); i++ {
 		if langs[i].lines > 0 {
 			// Retrieve icon or default if not found
