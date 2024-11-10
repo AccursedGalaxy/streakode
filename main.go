@@ -14,6 +14,12 @@ import (
 	"github.com/spf13/viper"
 )
 
+/*
+TODO:
+- Add automatic update functionality (manually code this cuz it's fun)
+- Add easy installation script (curl | bash)
+*/
+
 var Version = "dev" // This will be overwritten during build
 
 type GitHubRelease struct {
