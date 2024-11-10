@@ -16,7 +16,7 @@ import (
     "github.com/blang/semver"
 )
 
-var Version = "dev" // This will be overwritten during build
+var Version = "1.5.6" // This will be overwritten during build
 
 type GitHubRelease struct {
 	TagName string `json:"tag_name"`
@@ -251,46 +251,64 @@ func main() {
 	}
 
 	// Add a command to check for updates
-	updateCmd := &cobra.Command{
-		Use:   "update",
-		Short: "Check for updates and apply if available",
-		Run: func(cobraCmd *cobra.Command, args []string) {
-			updater, err := selfupdate.NewUpdater(selfupdate.Config{})
-			if err != nil {
-				fmt.Printf("Error initializing updater: %v\n", err)
-				return
-			}
-			repo := "AccursedGalaxy/streakode" // Your GitHub repo
+    updateCmd := &cobra.Command{
+        Use:   "update",
+        Short: "Check for updates and apply if available",
+        Run: func(cobraCmd *cobra.Command, args []string) {
+            updater, err := selfupdate.NewUpdater(selfupdate.Config{})
+            if err != nil {
+                fmt.Printf("Error initializing updater: %v\n", err)
+                return
+            }
 
-			latest, found, err := updater.DetectLatest(repo)
-			if err != nil {
-				fmt.Printf("Error checking for updates: %v\n", err)
-				return
-			}
+            repo := "AccursedGalaxy/streakode" // Your GitHub repo
+            fmt.Printf("Current version: %s\n", Version)
 
-			// Parse the current version
-			currentVersion, err := semver.ParseTolerant(Version)
-			if err != nil {
-				fmt.Printf("Error parsing current version: %v\n", err)
-				return
-			}
+            latest, found, err := updater.DetectLatest(repo)
+            if err != nil {
+                fmt.Printf("Error checking for updates: %v\n", err)
+                return
+            }
+            if !found {
+                fmt.Println("No latest release found.")
+                return
+            }
+            if latest == nil {
+                fmt.Println("Error: Latest release information is nil.")
+                return
+            }
 
-			// Compare the current version with the latest version
-			if !found || latest.Version.LTE(currentVersion) {
-				fmt.Println("You are already using the latest version.")
-				return
-			}
+            // Add a check to ensure latest is not nil
+            if latest == nil {
+                fmt.Println("Error: Latest release information is nil.")
+                return
+            }
 
-			fmt.Printf("New version %s is available. Updating...\n", latest.Version)
-			if err := updater.UpdateTo(latest, os.Args[0]); err != nil {
-				fmt.Printf("Error updating to the latest version: %v\n", err)
-				return
-			}
+            fmt.Printf("Latest version: %s\n", latest.Version)
 
-			fmt.Println("Update successful!")
+            // Parse the current version
+            currentVersion, err := semver.ParseTolerant(Version)
+            if err != nil {
+                fmt.Printf("Error parsing current version: %v\n", err)
+                return
+            }
+
+            // Compare the current version with the latest version
+            if !found || latest.Version.LTE(currentVersion) {
+                fmt.Println("You are already using the latest version.")
+                return
+            }
+
+            fmt.Printf("New version %s is available. Updating...\n", latest.Version)
+            if err := updater.UpdateTo(latest, os.Args[0]); err != nil {
+                fmt.Printf("Error updating to the latest version: %v\n", err)
+                return
+            }
+
+            fmt.Println("Update successful!")
             fmt.Printf("Release notes: %s\n", latest.ReleaseNotes)
-		},
-	}
+        },
+    }
 
 	authorCmd := &cobra.Command{
 		Use:   "author",
