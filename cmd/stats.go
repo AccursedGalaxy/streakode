@@ -131,6 +131,16 @@ func DisplayStats() {
 	fmt.Println(output)
 }
 
+func calculateTableWith() int {
+	width, _, err := term.GetSize(0)
+	if err != nil {
+		width = defaultTerminalWidth
+	}
+	tableWidth := min(width-2,maxTableWidth)
+    return tableWidth
+}
+
+
 // TODO: Function too long, refactor and split into smaller functions for better readability and maintainability
 func buildProjectsSection() string {
 	if !config.AppConfig.DisplayStats.ShowActiveProjects {
@@ -169,14 +179,8 @@ func buildProjectsSection() string {
 		})
 	}
 
-	// Width calculations
-	width, _, err := term.GetSize(0)
-	if err != nil {
-		width = defaultTerminalWidth
-	}
-	tableWidth := min(width-2,maxTableWidth)
-
-	// Configure table with column ratios
+    // Configure table column widths
+    tableWidth := calculateTableWith()
 	t.SetColumnConfigs([]table.ColumnConfig{
 		{Number: 1, WidthMax: int(float64(tableWidth) * 0.35)}, // Repository name
 		{Number: 2, WidthMax: int(float64(tableWidth) * 0.15)}, // Weekly commits
