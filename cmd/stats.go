@@ -15,6 +15,18 @@ import (
 	"golang.org/x/term"
 )
 
+/*
+General TODOs:
+- [ ] Cache Terminal Width as it is used multiple times
+- [ ] Pre-Allocate Memory for Slices
+- [ ] Use Constant for Magic Numbers
+
+Testing Stuff:
+- [ ] Create unit tests for calculation logic
+- [ ] Consider using interfaces for better testing
+- [ ] Add validation for config values
+*/
+
 type repoInfo struct {
     name       string
     metadata   scan.RepoMetadata
