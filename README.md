@@ -6,6 +6,9 @@
 
 Streakode is a powerful Git activity tracker that helps developers monitor their coding streaks, commit patterns, and project engagement. It provides insightful statistics about your coding habits across multiple repositories, with support for different profiles (e.g., work and personal projects).
 
+# Preview 📊 (image file in images folder)
+![Streakode Preview](images/streakode_preview.png)
+
 ## Features ✨
 
 - 📊 Enhanced commit tracking and statistics
@@ -52,50 +55,47 @@ make install
 Create a configuration file at `~/.streakodeconfig.yaml`:
 
 ```yaml
-author: "Your Name"
-dormant_threshold: 90
+author: "AccursedGalaxy"
+dormant_threshold: 31  # days
 scan_directories:
   - "~/github"
-  - "~/work/projects"
-refresh_interval: 24
+scan_settings:
+  excluded_patterns:
+    - "node_modules"
+    - "dist"
+    - ".git"
+    - "vendor"
+    - "build"
+    - ".cache"
+  excluded_paths:
+    - "/home/user/Downloads/"
+refresh_interval: 60   # Minutes
 
 display_stats:
   show_welcome_message: true
-  show_weekly_commits: true
-  show_monthly_commits: true
-  show_total_commits: true
   show_active_projects: true
   show_insights: true
-  max_projects: 5
-  
-  # Table styling
-  table_style:
-    show_border: false
-    column_separator: " "
-    center_separator: "─"
-    header_alignment: "center"
-    show_header_line: false
-    show_row_lines: false
-    min_column_widths:
-      repository: 20
-      weekly: 8
-      streak: 8
-      changes: 13
-      activity: 10
+  max_projects: 10
 
-  # Activity indicators
+  table_style:
+    use_table_header: true
+    style: "rounded" # default, rounded, bold, light, double
+    options:
+      draw_border: true
+      separate_columns: true # doesnt work :(
+      separate_header: true
+      separate_rows: false
+
   activity_indicators:
-    high_activity: "🔥"
-    normal_activity: "⚡"
-    no_activity: "💤"
-    streak_record: "🏆"
+    high_activity: "🚀"
+    normal_activity: "✨"
+    no_activity: "🌑"
+    streak_record: "🏅"
     active_streak: "🔥"
 
-  # Activity thresholds
   thresholds:
     high_activity: 10
 
-  # Insight settings
   insight_settings:
     top_languages_count: 3
     show_daily_average: true
@@ -103,41 +103,46 @@ display_stats:
     show_peak_coding: true
     show_weekly_summary: true
     show_weekly_goal: true
-    show_most_active: true
+    show_most_active: false # not showing when detailed stats is true (could remove)
 
 goal_settings:
-  weekly_commit_goal: 10
+  weekly_commit_goal: 50
 
 colors:
-  header_color: "#FF96B4"
-  section_color: "#87CEEB"
-  divider_color: "#808080"
+  header_color: "#FF69B4"
 
 detailed_stats: true
 
 language_settings:
-  excluded_extensions: [".yaml", ".txt", ".md"]
-  excluded_languages: ["YAML", "Text", "Markdown"]
+  excluded_extensions:
+    - ".md"
+    - ".txt"
+    - ".yaml"
+    - ".json"
+  excluded_languages:
+    - "Markdown"
+    - "Text"
+    - "YAML"
+    - "JSON"
   minimum_lines: 100
-```
+  language_display:
+    go_display: "🔵 Go"
+    python_display: "🐍 Python"
+    lua_display: "🌙 Lua"
+    javascript_display: "💛 JavaScript"
+    typescript_display: "🔷 TypeScript"
+    rust_display: "🦀 Rust"
+    cpp_display: "💥 C++"
+    c_display: "🌟 C"
+    java_display: "☕ Java"
+    ruby_display: "💎 Ruby"
+    php_display: "🐘 PHP"
+    html_display: "🌐 HTML"
+    css_display: "🎨 CSS"
+    shell_display: "🐚 Shell"
+    default_display: "📄 File"  # Fallback icon for unspecified languages
 
-### Example Output
-
-```
-🚀 Your Name's Coding Activity
-──────────────────────────────────────
-📊 3 commits this week • 12 this month
-──────────────────────────────────────
-Repository    Weekly    Streak    Changes      Activity
-🔥 project-a    5↑       3d🔥      +150/-50    today
-⚡ project-b    2↑       1d        +80/-20     2d ago
-💤 project-c    0↑       0d        +0/-0       5d ago
-──────────────────────────────────────
-📈 Weekly Summary: 7 commits, +230/-70 lines
-📊 Daily Average: 1.0 commits
-💻 Top Languages: Go:2.5k, Python:1.2k, JavaScript:0.8k
-⏰ Peak Coding: 14:00-15:00 (3 commits)
-🎯 Weekly Goal: 70% (7/10 commits)
+show_dividers: false
 ```
 
 ## Usage 💻
@@ -156,15 +161,15 @@ streakode author
 streakode stats
 
 # Refresh repository cache
-streakode refresh
+streakode cache reload
+
+# Clear repository cache
+streakode cache clean
 
 # Switch profiles
 streakode profile work    # Switch to work profile
 streakode profile home    # Switch to home profile
-streakode profile -       # Switch to default profile
-
-# Use different profile for a single command
-streakode stats --profile work
+streakode profile default # Switch to default profile
 ```
 
 ## Updating 🔄
