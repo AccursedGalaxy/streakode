@@ -131,14 +131,14 @@ func buildProjectsSection() string {
 		})
 	}
 
-	// Simplify width calculations
+	// Width calculations
 	width, _, err := term.GetSize(0)
 	if err != nil {
 		width = 80
 	}
 	tableWidth := min(width-2, 120)
 
-	// Configure table with simpler column ratios
+	// Configure table with column ratios
 	t.SetColumnConfigs([]table.ColumnConfig{
 		{Number: 1, WidthMax: int(float64(tableWidth) * 0.35)}, // Repository name
 		{Number: 2, WidthMax: int(float64(tableWidth) * 0.15)}, // Weekly commits
@@ -149,34 +149,6 @@ func buildProjectsSection() string {
 
 	// Set overall table width
 	t.SetAllowedRowLength(tableWidth)
-
-	// Use simpler style configuration
-	style := table.Style{
-		Box: table.BoxStyle{
-			BottomLeft:       "└",
-			BottomRight:      "┘",
-			BottomSeparator:  "┴",
-			Left:            "│",
-			LeftSeparator:    "├",
-			MiddleHorizontal: "─",
-			MiddleSeparator:  "┼",
-			MiddleVertical:   "│",
-			PaddingLeft:      " ",
-			PaddingRight:     " ",
-			Right:           "│",
-			RightSeparator:   "┤",
-			TopLeft:         "┌",
-			TopRight:        "┐",
-			TopSeparator:    "┬",
-		},
-		Options: table.Options{
-			DrawBorder:      config.AppConfig.DisplayStats.TableStyle.Options.DrawBorder,
-			SeparateColumns: config.AppConfig.DisplayStats.TableStyle.Options.SeparateColumns,
-			SeparateHeader:  config.AppConfig.DisplayStats.TableStyle.Options.SeparateHeader,
-			SeparateRows:    config.AppConfig.DisplayStats.TableStyle.Options.SeparateRows,
-		},
-	}
-	t.SetStyle(style)
 
 	displayCount := min(len(repos), config.AppConfig.DisplayStats.MaxProjects)
 	for i := 0; i < displayCount; i++ {
