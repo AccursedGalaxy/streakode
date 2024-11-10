@@ -111,6 +111,7 @@ func DisplayStats() {
 	fmt.Println(output)
 }
 
+// TODO: Function too long, refactor and split into smaller functions for better readability and maintainability
 func buildProjectsSection() string {
 	if !config.AppConfig.DisplayStats.ShowActiveProjects {
 		return ""
@@ -312,6 +313,7 @@ func getTableStyle() table.Style {
             SeparateHeader: config.AppConfig.DisplayStats.TableStyle.Options.SeparateHeader,
             SeparateRows:   config.AppConfig.DisplayStats.TableStyle.Options.SeparateRows,
         },
+        // TODO: Make this configurable
         Box: table.BoxStyle{
             PaddingLeft:  "",
             PaddingRight: " ",
@@ -332,6 +334,7 @@ func processLanguageStats(cache map[string]scan.RepoMetadata) map[string]int {
     return languageStats
 }
 
+// TODO: Function too long, refactor and split into smaller functions for better readability and maintainability
 func buildInsightsSection() string {
 	if !config.AppConfig.DisplayStats.ShowInsights {
 		return ""
@@ -410,7 +413,7 @@ func buildInsightsSection() string {
 			t.AppendRow(table.Row{"📈", "Weekly Summary:", summary})
 		}
 
-		// TODO: Show A Comparison To Last weeks Daily Average
+        // NOTE: Possibly Show A Comparison To Last weeks Daily Average
 		if insights.ShowDailyAverage {
 			t.AppendRow(table.Row{"📊", "Daily Average:",
 				fmt.Sprintf("%.1f commits", float64(totalWeeklyCommits)/7.0)})
