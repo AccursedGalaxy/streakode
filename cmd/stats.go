@@ -17,9 +17,7 @@ import (
 
 /*
 General TODOs:
-- [ ] Cache Terminal Width as it is used multiple times
 - [ ] Pre-Allocate Memory for Slices
-- [ ] Use Constant for Magic Numbers
 
 Testing Stuff:
 - [ ] Create unit tests for calculation logic
