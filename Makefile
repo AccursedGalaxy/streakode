@@ -52,6 +52,6 @@ release:
 
 # Downgrade to version 1.5.4
 downgrade:
-	@git checkout tags/v1.5.4
+	@git checkout tags/v1.5.5
 	@make build
-	@echo "Downgraded to version 1.5.4. Please run 'make install' to apply the changes."
+	@echo "Downgraded to version 1.5.5. Please run 'make install' to apply the changes."
