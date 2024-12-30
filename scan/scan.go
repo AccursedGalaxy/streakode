@@ -101,9 +101,10 @@ func GetCurrentWeekRange() DateRange {
 	if daysFromMonday == 0 { // Sunday
 		daysFromMonday = 7
 	}
+	daysFromMonday-- // Adjust to make Monday 0
 
-	// Calculate start of week
-	startDate := startOfDay.AddDate(0, 0, -daysFromMonday+1)
+	// Calculate start of week (last Monday)
+	startDate := startOfDay.AddDate(0, 0, -daysFromMonday)
 
 	if config.AppConfig.Debug {
 		fmt.Printf("Debug: Start of day: %s\n", startOfDay.Format("2006-01-02"))
@@ -198,10 +199,14 @@ func countLastWeeksCommits(dates []string) int {
 // Refactored version of countRecentCommits using date ranges
 func countRecentCommits(dates []string, days int) int {
 	now := time.Now()
+	startDate := now.AddDate(0, 0, -days+1) // Include today
+	startDate = time.Date(startDate.Year(), startDate.Month(), startDate.Day(), 0, 0, 0, 0, startDate.Location())
+
 	dateRange := DateRange{
-		Start: now.AddDate(0, 0, -days),
-		End:   now,
+		Start: startDate,
+		End:   now.AddDate(0, 0, 1), // Include commits from today
 	}
+
 	if config.AppConfig.Debug {
 		fmt.Printf("Debug: Recent commits range: %s to %s\n",
 			dateRange.Start.Format("2006-01-02"),
