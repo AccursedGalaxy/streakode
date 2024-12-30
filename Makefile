@@ -20,8 +20,12 @@ build:
 install: build
 	@echo "Installing streakode..."
 	@sudo install -m 755 bin/streakode /usr/local/bin/streakode
-	@echo "Creating 'sk' alias..."
-	@sudo ln -sf /usr/local/bin/streakode /usr/local/bin/sk
+	@if [ ! -e /usr/local/bin/sk ] || [ ! -L /usr/local/bin/sk ] || [ ! "$$(readlink /usr/local/bin/sk)" = "/usr/local/bin/streakode" ]; then \
+		echo "Creating 'sk' alias..."; \
+		sudo ln -sf /usr/local/bin/streakode /usr/local/bin/sk; \
+	else \
+		echo "'sk' alias already exists and points to streakode"; \
+	fi
 	@echo "✨ Installation complete! You can now use 'streakode' or 'sk' to run the CLI."
 
 # Clean build artifacts
