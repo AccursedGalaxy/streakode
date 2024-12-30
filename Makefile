@@ -20,6 +20,9 @@ build:
 install: build
 	@echo "Installing streakode..."
 	@sudo install -m 755 bin/streakode /usr/local/bin/streakode
+	@echo "Creating 'sk' alias..."
+	@sudo ln -sf /usr/local/bin/streakode /usr/local/bin/sk
+	@echo "✨ Installation complete! You can now use 'streakode' or 'sk' to run the CLI."
 
 # Clean build artifacts
 clean:

@@ -315,181 +315,121 @@ Example:
 
 	// Add history command
 	historyCmd := &cobra.Command{
-		Use:   "history",
-		Short: "Interactive Git history search and exploration",
-		Long: `Interactive Git history search and exploration with powerful filtering and viewing options.
+		Use:   "history [flags]",
+		Short: "Interactive Git history search",
+		Long: `Search and explore your Git commit history interactively.
 
-This command provides a fast, interactive interface to explore your Git history across all repositories.
-It uses fuzzy finding (fzf) for instant searching through commits, with results loading progressively
-as they become available.
-
-Key Features:
-- Instant interactive fuzzy search through commit history
-- Progressive loading of results for immediate responsiveness
-- Rich commit preview with diff and stats
-- Multiple view formats and sorting options
-- Smart caching for faster subsequent searches
-- Keyboard shortcuts for efficient navigation
-
-Navigation:
-- Type to filter commits instantly
-- Ctrl-a: Toggle select all commits
-- Ctrl-d/u: Page down/up
-- Ctrl-/: Toggle preview panel
-- Enter: Select commit(s)
-- Esc: Exit search`,
-		Example: `  # Interactive search through all commits (last 7 days)
-  streakode history
-
-  # Show detailed history for the last 30 days
-  streakode history --days 30 --format detailed`,
+Uses fuzzy search to quickly find commits across all repositories.
+Press '?' while searching to see keyboard shortcuts.`,
+		Example: `  sk history                  # Show commits from last 7 days
+  sk history --days 30        # Show last 30 days
+  sk history author robin     # Show commits by author
+  sk history repo myproject   # Show commits in repository`,
 		Run: func(cobraCmd *cobra.Command, args []string) {
 			var opts cmd.HistoryOptions
-
-			// Get flags
 			days, _ := cobraCmd.Flags().GetInt("days")
 			format, _ := cobraCmd.Flags().GetString("format")
-
-			// Set options for base history command - no filtering
 			opts.Days = days
 			opts.Format = format
 			if days == 0 {
-				opts.Days = 7 // default to 7 days
+				opts.Days = 7
 			}
-
 			cmd.DisplayHistory(opts)
 		},
 	}
 
-	// Add subcommands
-	historyAuthorCmd := &cobra.Command{
-		Use:   "author [author-name]",
-		Short: "Search history for a specific author",
-		Long: `Search through Git history for commits by a specific author.
+	// Add persistent flags that will be inherited by all subcommands
+	historyCmd.PersistentFlags().IntP("days", "n", 7, "Number of days to show history for")
+	historyCmd.PersistentFlags().StringP("format", "f", "default", "Output format (default, detailed, compact)")
 
-The search interface will show commits from the specified author across all repositories,
-with results loading progressively as they become available.`,
+	// Add subcommands with cleaner help text
+	historyAuthorCmd := &cobra.Command{
+		Use:   "author [name]",
+		Short: "Show commits by author",
+		Example: `  sk history author robin     # Show Robin's commits
+  sk history author "John D"  # Show John D's commits`,
 		Args: cobra.ExactArgs(1),
 		Run: func(cobraCmd *cobra.Command, args []string) {
 			var opts cmd.HistoryOptions
 			opts.Author = args[0]
-
-			// Get flags
-			days, _ := cobraCmd.Flags().GetInt("days")
-			format, _ := cobraCmd.Flags().GetString("format")
-
+			days, _ := cobraCmd.PersistentFlags().GetInt("days")
+			format, _ := cobraCmd.PersistentFlags().GetString("format")
 			opts.Days = days
 			opts.Format = format
 			if days == 0 {
-				opts.Days = 14 // default to 14 days for author search
+				opts.Days = 14
 			}
-
 			cmd.DisplayHistory(opts)
 		},
 	}
 
 	historyRepoCmd := &cobra.Command{
-		Use:   "repo [repository-name]",
-		Short: "Search history in a specific repository",
-		Long: `Search through Git history of a specific repository.
-
-The search interface will show commits from the specified repository,
-with results loading progressively as they become available.`,
+		Use:   "repo [name]",
+		Short: "Show commits in repository",
+		Example: `  sk history repo myproject   # Show commits in myproject
+  sk history repo webapp     # Show commits in webapp`,
 		Args: cobra.ExactArgs(1),
 		Run: func(cobraCmd *cobra.Command, args []string) {
 			var opts cmd.HistoryOptions
 			opts.Repository = args[0]
-
-			// Get flags
-			days, _ := cobraCmd.Flags().GetInt("days")
-			format, _ := cobraCmd.Flags().GetString("format")
-
+			days, _ := cobraCmd.PersistentFlags().GetInt("days")
+			format, _ := cobraCmd.PersistentFlags().GetString("format")
 			opts.Days = days
 			opts.Format = format
 			if days == 0 {
-				opts.Days = 14 // default to 14 days for repo search
+				opts.Days = 14
 			}
-
 			cmd.DisplayHistory(opts)
 		},
 	}
 
 	historyRecentCmd := &cobra.Command{
 		Use:   "recent",
-		Short: "Show recent commit activity (last 24 hours)",
-		Long: `Display Git activity from the last 24 hours across all repositories.
-
-Results are shown in detailed format by default and load progressively for
-immediate responsiveness.`,
+		Short: "Show commits from last 24 hours",
 		Run: func(cobraCmd *cobra.Command, args []string) {
 			var opts cmd.HistoryOptions
 			opts.Days = 1
 			opts.Format = "detailed"
-
 			cmd.DisplayHistory(opts)
 		},
 	}
 
 	historyFilesCmd := &cobra.Command{
 		Use:   "files [pattern]",
-		Short: "Search through file changes",
-		Long: `Search through Git history focusing on file changes.
-
-This command allows you to search through commit history with an emphasis on
-file changes. Results show detailed file statistics and can be filtered by
-file patterns.`,
+		Short: "Search commits by changed files",
+		Example: `  sk history files "*.go"     # Show commits changing Go files
+  sk history files config    # Show commits changing config files`,
 		Run: func(cobraCmd *cobra.Command, args []string) {
 			var opts cmd.HistoryOptions
 			opts.Format = "files"
-
 			if len(args) > 0 {
 				opts.Query = args[0]
 			}
-
-			// Get flags
-			days, _ := cobraCmd.Flags().GetInt("days")
+			days, _ := cobraCmd.PersistentFlags().GetInt("days")
 			opts.Days = days
 			if days == 0 {
 				opts.Days = 7
 			}
-
 			cmd.DisplayHistory(opts)
 		},
 	}
 
 	historyStatsCmd := &cobra.Command{
 		Use:   "stats",
-		Short: "Show commit activity statistics",
-		Long: `Display detailed Git activity statistics across repositories.
-
-This command provides a statistical overview of Git activity, including:
-- Commit frequency and patterns
-- File change statistics
-- Author activity
-- Repository contributions
-
-Results are loaded progressively and shown in a detailed format optimized
-for statistical analysis.`,
+		Short: "Show commit statistics",
 		Run: func(cobraCmd *cobra.Command, args []string) {
 			var opts cmd.HistoryOptions
 			opts.Format = "stats"
-
-			// Get flags
-			days, _ := cobraCmd.Flags().GetInt("days")
+			days, _ := cobraCmd.PersistentFlags().GetInt("days")
 			opts.Days = days
 			if days == 0 {
-				opts.Days = 30 // default to 30 days for stats
+				opts.Days = 30
 			}
-
 			cmd.DisplayHistory(opts)
 		},
 	}
 
-	// Add flags to history command
-	historyCmd.PersistentFlags().Int("days", 0, "Number of days of history to show")
-	historyCmd.PersistentFlags().String("format", "default", "Output format (default, detailed, compact)")
-
-	// Add subcommands to history
+	// Add subcommands to history command
 	historyCmd.AddCommand(historyAuthorCmd)
 	historyCmd.AddCommand(historyRepoCmd)
 	historyCmd.AddCommand(historyRecentCmd)
