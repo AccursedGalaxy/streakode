@@ -12,6 +12,64 @@ This document outlines new and additional features that are planned or already i
    -> i.e.: streakode history -a AccursedGalaxy -> get detailed and nicely formatted information about the recent git activity from the selected author (-a flag) going beyond just commit message. (I love the idea with a nice and insightful overview this gonna be usefull)
    -> i.e.: streakode hisotry -r streakode -> get detailed and nicely formatted information about the recent activity from a project not just form a single author. (Also really great idea and possibly super usefull)
 
+
+1. **Branch-Based Search**:
+```bash
+streakode history branch <branch-name>
+```
+- Search commits specific to a branch across repos
+- Show branch relationships and merge history
+- Compare branches visually
+
+2. **Content Search**:
+```bash
+streakode history search "query"
+```
+- Full-text search in commit diffs
+- Search for specific code changes
+- Find when a particular line was added/removed
+
+3. **Patch Management**:
+```bash
+streakode history patch
+```
+- Interactive selection of commits to create patches
+- Cherry-pick commits across repositories
+- Create patch series for code review
+
+4. **Time-Based Navigation**:
+```bash
+streakode history timeline
+```
+- Visual timeline of commits
+- Group by time periods (day/week/month)
+- Show parallel development streams
+
+5. **Related Commits**:
+```bash
+streakode history related <commit-hash>
+```
+- Find commits that modify the same files
+- Show commit dependencies
+- Track bug fixes and related changes
+
+6. **Tag/Release History**:
+```bash
+streakode history releases
+```
+- Show version tags and releases
+- Group commits by release
+- Show changelog-style history
+
+7. **Refactor History**:
+```bash
+streakode history refactor <file/directory>
+```
+- Track major refactoring changes
+- Show file movement history
+- Visualize code evolution
+
+
 ## Next To Implement 🚀
 
 ### Testing Implementation
