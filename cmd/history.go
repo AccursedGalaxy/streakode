@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/AccursedGalaxy/streakode/cache"
@@ -54,31 +55,301 @@ func DisplayHistory(opts HistoryOptions) {
 		opts.Preview = true
 	}
 
-	// Get commit history
-	commits := getCommitHistory(opts)
-	if len(commits) == 0 {
-		fmt.Println("No commits found for the specified criteria.")
-		return
-	}
+	// Create channels for progressive loading
+	commitChan := make(chan CommitSummary, 100)
+	doneChan := make(chan bool)
 
-	displayInteractiveHistory(commits, opts)
+	// Start loading commits in background
+	go loadCommitsProgressively(opts, commitChan, doneChan)
+
+	// Start interactive search immediately
+	displayInteractiveHistoryProgressive(commitChan, doneChan, opts)
 }
 
-func displayInteractiveHistory(commits []CommitSummary, opts HistoryOptions) {
-	// Convert CommitSummary to SearchResult
-	var searchResults []search.SearchResult
-	for _, commit := range commits {
-		searchResults = append(searchResults, search.SearchResult{
-			Hash:       commit.Hash,
-			Date:       commit.Date,
-			Message:    commit.Message,
-			FileCount:  commit.FileCount,
-			Additions:  commit.Additions,
-			Deletions:  commit.Deletions,
-			Repository: commit.Repository,
-			Branch:     commit.Branch,
+func loadCommitsProgressively(opts HistoryOptions, commitChan chan<- CommitSummary, doneChan chan<- bool) {
+	defer close(commitChan)
+	defer close(doneChan)
+
+	var wg sync.WaitGroup
+	since := time.Now().AddDate(0, 0, -opts.Days)
+
+	// Use semaphore to limit concurrent git operations
+	sem := make(chan struct{}, 5) // Limit to 5 concurrent git operations
+
+	// First try to get commits from cache
+	cachedCommits := getCachedCommits(opts, since)
+	for _, commit := range cachedCommits {
+		commitChan <- commit
+	}
+
+	// Then process repositories concurrently
+	cache.Cache.Range(func(path string, repo scan.RepoMetadata) bool {
+		if opts.Repository != "" && !matchesRepository(path, opts.Repository) {
+			return true
+		}
+
+		wg.Add(1)
+		go func(repoPath string) {
+			defer wg.Done()
+			sem <- struct{}{}        // Acquire semaphore
+			defer func() { <-sem }() // Release semaphore
+
+			repoName := extractRepoName(repoPath)
+
+			// Get local commits first (faster)
+			localCommits := getLocalCommitsOptimized(repoPath, opts, since)
+			for _, commit := range localCommits {
+				commit.Repository = repoName
+				commitChan <- commit
+			}
+
+			// Only fetch remote data if needed and not too many local commits
+			if len(localCommits) < 100 && shouldFetchRemote(repoPath) {
+				// Fetch remote data in background
+				go func() {
+					fetchRemoteData(repoPath)
+					remoteCommits := getRemoteCommitsOptimized(repoPath, opts, since)
+					// Only send remote commits that aren't in local
+					seenHashes := make(map[string]bool)
+					for _, c := range localCommits {
+						seenHashes[c.Hash] = true
+					}
+					for _, commit := range remoteCommits {
+						if !seenHashes[commit.Hash] {
+							commit.Repository = repoName
+							commitChan <- commit
+						}
+					}
+				}()
+			}
+		}(path)
+		return true
+	})
+
+	wg.Wait()
+	doneChan <- true
+}
+
+func getCachedCommits(opts HistoryOptions, since time.Time) []CommitSummary {
+	var commits []CommitSummary
+	cache.Cache.Range(func(path string, repo scan.RepoMetadata) bool {
+		if opts.Repository != "" && !matchesRepository(path, opts.Repository) {
+			return true
+		}
+
+		repoName := extractRepoName(path)
+		for _, ch := range repo.CommitHistory {
+			if ch.Date.After(since) {
+				commits = append(commits, CommitSummary{
+					Hash:       ch.Hash,
+					Date:       ch.Date,
+					Message:    ch.MessageHead,
+					FileCount:  ch.FileCount,
+					Additions:  ch.Additions,
+					Deletions:  ch.Deletions,
+					Repository: repoName,
+				})
+			}
+		}
+		return true
+	})
+	return commits
+}
+
+func getLocalCommitsOptimized(repoPath string, opts HistoryOptions, since time.Time) []CommitSummary {
+	var commits []CommitSummary
+
+	// Build optimized git log command
+	args := []string{
+		"-C", repoPath,
+		"log",
+		"--no-merges",
+		"--date-order",
+		"--pretty=format:%H%x00%aI%x00%an%x00%ae%x00%s%x00",
+		"--numstat",
+		"--after=" + since.Format("2006-01-02"),
+		"--max-count=1000", // Limit to prevent excessive processing
+	}
+
+	if opts.Author != "" {
+		args = append(args, "--author="+opts.Author)
+	}
+
+	// Add branch filtering if specified
+	if opts.Branch != "" {
+		args = append(args, opts.Branch)
+	} else {
+		args = append(args, "--all")
+	}
+
+	// Execute command with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "git", args...)
+	output, err := cmd.Output()
+	if err != nil {
+		if config.AppConfig.Debug {
+			fmt.Printf("Error getting local commits from %s: %v\n", repoPath, err)
+		}
+		return commits
+	}
+
+	return parseGitLogOptimized(string(output))
+}
+
+func parseGitLogOptimized(output string) []CommitSummary {
+	var commits []CommitSummary
+	entries := strings.Split(output, "\n\n")
+
+	for _, entry := range entries {
+		if entry == "" {
+			continue
+		}
+
+		lines := strings.Split(entry, "\n")
+		if len(lines) == 0 {
+			continue
+		}
+
+		// Parse commit info more efficiently
+		parts := strings.Split(lines[0], "\x00")
+		if len(parts) < 5 {
+			continue
+		}
+
+		date, _ := time.Parse(time.RFC3339, parts[1])
+
+		// Process stats in batches
+		var additions, deletions, fileCount int
+		for _, line := range lines[1:] {
+			if line == "" {
+				continue
+			}
+			statParts := strings.Fields(line)
+			if len(statParts) < 3 {
+				continue
+			}
+			add, _ := strconv.Atoi(statParts[0])
+			del, _ := strconv.Atoi(statParts[1])
+			additions += add
+			deletions += del
+			fileCount++
+		}
+
+		commits = append(commits, CommitSummary{
+			Hash:       parts[0],
+			Date:       date,
+			Message:    parts[4],
+			FileCount:  fileCount,
+			Additions:  additions,
+			Deletions:  deletions,
+			TotalLines: additions + deletions,
+			Author:     fmt.Sprintf("%s <%s>", parts[2], parts[3]),
 		})
 	}
+
+	return commits
+}
+
+func getRemoteCommitsOptimized(repoPath string, opts HistoryOptions, since time.Time) []CommitSummary {
+	var commits []CommitSummary
+
+	// Get remote branches efficiently
+	cmd := exec.Command("git", "-C", repoPath, "for-each-ref", "--format=%(refname)", "refs/remotes/origin")
+	output, err := cmd.Output()
+	if err != nil {
+		return commits
+	}
+
+	branches := strings.Split(string(output), "\n")
+
+	// Process branches in parallel with a limit
+	sem := make(chan struct{}, 3) // Limit concurrent branch processing
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+
+	for _, branch := range branches {
+		if branch == "" {
+			continue
+		}
+
+		wg.Add(1)
+		go func(branchName string) {
+			defer wg.Done()
+			sem <- struct{}{}        // Acquire semaphore
+			defer func() { <-sem }() // Release semaphore
+
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+
+			args := []string{
+				"-C", repoPath,
+				"log",
+				"--no-merges",
+				"--date-order",
+				branchName,
+				"--pretty=format:%H%x00%aI%x00%an%x00%ae%x00%s%x00",
+				"--numstat",
+				"--after=" + since.Format("2006-01-02"),
+				"--max-count=500", // Limit per branch
+			}
+
+			if opts.Author != "" {
+				args = append(args, "--author="+opts.Author)
+			}
+
+			cmd := exec.CommandContext(ctx, "git", args...)
+			output, err := cmd.Output()
+			if err != nil {
+				return
+			}
+
+			branchCommits := parseGitLogOptimized(string(output))
+
+			mu.Lock()
+			commits = append(commits, branchCommits...)
+			mu.Unlock()
+		}(branch)
+	}
+
+	wg.Wait()
+	return commits
+}
+
+func displayInteractiveHistoryProgressive(commitChan <-chan CommitSummary, doneChan <-chan bool, opts HistoryOptions) {
+	// Convert commits to search results as they arrive
+	resultsChan := make(chan search.SearchResult, 100)
+	go func() {
+		defer close(resultsChan)
+
+		seen := make(map[string]bool)
+		for {
+			select {
+			case commit, ok := <-commitChan:
+				if !ok {
+					return
+				}
+				// Deduplicate commits
+				if !seen[commit.Hash] {
+					seen[commit.Hash] = true
+					resultsChan <- search.SearchResult{
+						Hash:       commit.Hash,
+						Date:       commit.Date,
+						Message:    commit.Message,
+						FileCount:  commit.FileCount,
+						Additions:  commit.Additions,
+						Deletions:  commit.Deletions,
+						Repository: commit.Repository,
+						Branch:     commit.Branch,
+						Author:     commit.Author,
+					}
+				}
+			case <-doneChan:
+				return
+			}
+		}
+	}()
 
 	// Configure search options
 	searchOpts := search.SearchOptions{
@@ -88,13 +359,19 @@ func displayInteractiveHistory(commits []CommitSummary, opts HistoryOptions) {
 		Author:      opts.Author,
 		Interactive: true,
 		Format:      opts.Format,
+		Progressive: true,
 	}
 
-	// Run interactive search
-	selected, err := search.RunInteractiveSearch(searchResults, searchOpts)
+	// Run interactive search with progressive loading
+	selected, err := search.RunInteractiveSearchProgressive(resultsChan, searchOpts)
 	if err != nil {
 		if err.Error() == "fzf is not installed" {
 			fmt.Println("Interactive search requires fzf. Falling back to table view.")
+			// Collect remaining commits for table view
+			var commits []CommitSummary
+			for commit := range commitChan {
+				commits = append(commits, commit)
+			}
 			displayTableHistory(commits, opts)
 			return
 		}
@@ -127,72 +404,6 @@ func handleSelectedCommits(commits []search.SearchResult) {
 	fmt.Println(t.Render())
 }
 
-func getCommitHistory(opts HistoryOptions) []CommitSummary {
-	var commits []CommitSummary
-	since := time.Now().AddDate(0, 0, -opts.Days)
-
-	// Use channels for concurrent processing
-	type repoResult struct {
-		commits []CommitSummary
-		err     error
-	}
-	results := make(chan repoResult)
-
-	// Process repositories concurrently
-	activeRepos := 0
-	cache.Cache.Range(func(path string, repo scan.RepoMetadata) bool {
-		if opts.Repository != "" && !matchesRepository(path, opts.Repository) {
-			return true
-		}
-		activeRepos++
-
-		go func(repoPath string) {
-			repoName := extractRepoName(repoPath)
-			var result repoResult
-
-			// Only fetch if we need remote data and haven't fetched recently
-			if shouldFetchRemote(repoPath) {
-				fetchRemoteData(repoPath)
-			}
-
-			// Get local commits first (faster)
-			localCommits := getLocalCommits(repoPath, opts, since)
-			result.commits = localCommits
-
-			// Only fetch remote commits if local commits don't satisfy our needs
-			if len(localCommits) < 100 { // Arbitrary limit to avoid fetching too much
-				remoteCommits := getRemoteCommits(repoPath, opts, since)
-				result.commits = mergeCommits(localCommits, remoteCommits, repoName)
-			} else {
-				// Just set repository name for local commits
-				for i := range result.commits {
-					result.commits[i].Repository = repoName
-				}
-			}
-
-			results <- result
-		}(path)
-
-		return true
-	})
-
-	// Collect results
-	for i := 0; i < activeRepos; i++ {
-		result := <-results
-		if result.err != nil {
-			if config.AppConfig.Debug {
-				fmt.Printf("Error processing repository: %v\n", result.err)
-			}
-			continue
-		}
-		commits = append(commits, result.commits...)
-	}
-
-	// Sort commits by date (most recent first)
-	sortCommitsByDate(commits)
-	return commits
-}
-
 func shouldFetchRemote(repoPath string) bool {
 	// Check if repo has a remote
 	cmd := exec.Command("git", "-C", repoPath, "remote")
@@ -219,209 +430,6 @@ func fetchRemoteData(repoPath string) {
 	// Fetch all branches and tags
 	cmd := exec.Command("git", "-C", repoPath, "fetch", "--all", "--tags", "--force", "--quiet")
 	cmd.Run() // Ignore errors, we'll work with what we have
-}
-
-func getLocalCommits(repoPath string, opts HistoryOptions, since time.Time) []CommitSummary {
-	var commits []CommitSummary
-
-	// Build optimized git log command
-	args := []string{
-		"-C", repoPath,
-		"log",
-		"--no-merges", // Skip merge commits for cleaner history
-		"--date-order",
-		"--pretty=format:%H%x00%aI%x00%an%x00%ae%x00%s%x00%b%x00",
-		"--numstat",
-		"--after=" + since.Format("2006-01-02"),
-	}
-
-	if opts.Author != "" {
-		args = append(args, "--author="+opts.Author)
-	}
-
-	// Add branch filtering if specified
-	if opts.Branch != "" {
-		args = append(args, opts.Branch)
-	} else {
-		args = append(args, "--all")
-	}
-
-	// Execute command with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, "git", args...)
-	output, err := cmd.Output()
-	if err != nil {
-		if config.AppConfig.Debug {
-			fmt.Printf("Error getting local commits from %s: %v\n", repoPath, err)
-		}
-		return commits
-	}
-
-	return parseGitLog(string(output))
-}
-
-func getRemoteCommits(repoPath string, opts HistoryOptions, since time.Time) []CommitSummary {
-	var commits []CommitSummary
-
-	// Get remote branches efficiently
-	cmd := exec.Command("git", "-C", repoPath, "for-each-ref", "--format=%(refname)", "refs/remotes/origin")
-	output, err := cmd.Output()
-	if err != nil {
-		return commits
-	}
-
-	branches := strings.Split(string(output), "\n")
-
-	// Process each branch concurrently
-	type branchResult struct {
-		commits []CommitSummary
-		err     error
-	}
-	results := make(chan branchResult, len(branches))
-
-	for _, branch := range branches {
-		if branch == "" {
-			continue
-		}
-
-		go func(branchName string) {
-			var result branchResult
-
-			// Get commits from remote branch with timeout
-			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-			defer cancel()
-
-			args := []string{
-				"-C", repoPath,
-				"log",
-				"--no-merges",
-				"--date-order",
-				branchName,
-				"--pretty=format:%H%x00%aI%x00%an%x00%ae%x00%s%x00%b%x00",
-				"--numstat",
-				"--after=" + since.Format("2006-01-02"),
-			}
-
-			if opts.Author != "" {
-				args = append(args, "--author="+opts.Author)
-			}
-
-			cmd := exec.CommandContext(ctx, "git", args...)
-			output, err := cmd.Output()
-			if err != nil {
-				result.err = err
-				results <- result
-				return
-			}
-
-			result.commits = parseGitLog(string(output))
-			results <- result
-		}(branch)
-	}
-
-	// Collect results with timeout
-	timeout := time.After(10 * time.Second)
-	for range branches {
-		select {
-		case result := <-results:
-			if result.err == nil {
-				commits = append(commits, result.commits...)
-			}
-		case <-timeout:
-			if config.AppConfig.Debug {
-				fmt.Printf("Timeout while getting remote commits from %s\n", repoPath)
-			}
-			return commits
-		}
-	}
-
-	return commits
-}
-
-func parseGitLog(output string) []CommitSummary {
-	var commits []CommitSummary
-	entries := strings.Split(output, "\n\n")
-
-	for _, entry := range entries {
-		if entry == "" {
-			continue
-		}
-
-		lines := strings.Split(entry, "\n")
-		if len(lines) == 0 {
-			continue
-		}
-
-		// Parse commit info
-		parts := strings.Split(lines[0], "\x00")
-		if len(parts) < 6 {
-			continue
-		}
-
-		hash := parts[0]
-		date, _ := time.Parse(time.RFC3339, parts[1])
-		author := parts[2]
-		email := parts[3]
-		subject := parts[4]
-		body := parts[5]
-
-		// Parse stats
-		var additions, deletions, fileCount int
-		for _, line := range lines[1:] {
-			if line == "" {
-				continue
-			}
-			statParts := strings.Fields(line)
-			if len(statParts) < 3 {
-				continue
-			}
-			add, _ := strconv.Atoi(statParts[0])
-			del, _ := strconv.Atoi(statParts[1])
-			additions += add
-			deletions += del
-			fileCount++
-		}
-
-		commits = append(commits, CommitSummary{
-			Hash:       hash,
-			Date:       date,
-			Message:    subject + "\n\n" + body,
-			FileCount:  fileCount,
-			Additions:  additions,
-			Deletions:  deletions,
-			TotalLines: additions + deletions,
-			Author:     fmt.Sprintf("%s <%s>", author, email),
-		})
-	}
-
-	return commits
-}
-
-func mergeCommits(local, remote []CommitSummary, repoName string) []CommitSummary {
-	seen := make(map[string]bool)
-	var merged []CommitSummary
-
-	// Add all local commits
-	for _, commit := range local {
-		if !seen[commit.Hash] {
-			commit.Repository = repoName
-			merged = append(merged, commit)
-			seen[commit.Hash] = true
-		}
-	}
-
-	// Add remote commits that aren't in local
-	for _, commit := range remote {
-		if !seen[commit.Hash] {
-			commit.Repository = repoName
-			merged = append(merged, commit)
-			seen[commit.Hash] = true
-		}
-	}
-
-	return merged
 }
 
 func extractRepoName(path string) string {

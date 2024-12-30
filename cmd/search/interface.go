@@ -20,29 +20,27 @@ type SearchResult struct {
 	FileCount   int       `json:"file_count"`
 	Additions   int       `json:"additions"`
 	Deletions   int       `json:"deletions"`
-	Branch      string    `json:"branch"`      // Added to show branch information
-	DisplayText string    `json:"-"`           // Used for fzf display
+	Branch      string    `json:"branch"` // Added to show branch information
+	DisplayText string    `json:"-"`      // Used for fzf display
 }
 
 // SearchOptions defines the configuration for interactive search
 type SearchOptions struct {
-	Preview      bool   // Whether to show preview window
-	DetailLevel  int    // 0: basic, 1: detailed, 2: full
-	Query        string // Initial search query
-	Repository   string // Filter by repository
-	Author       string // Filter by author
-	Interactive  bool   // Whether to use interactive mode
+	Preview     bool   // Whether to show preview window
+	DetailLevel int    // 0: basic, 1: detailed, 2: full
+	Query       string // Initial search query
+	Repository  string // Filter by repository
+	Author      string // Filter by author
+	Interactive bool   // Whether to use interactive mode
 	Format      string // Output format (oneline, detailed, full)
+	Progressive bool   // Whether to use progressive loading
 }
 
-// RunInteractiveSearch starts an interactive search session using fzf
-func RunInteractiveSearch(results []SearchResult, opts SearchOptions) ([]SearchResult, error) {
+// RunInteractiveSearchProgressive starts an interactive search session using fzf with progressive loading
+func RunInteractiveSearchProgressive(resultsChan <-chan SearchResult, opts SearchOptions) ([]SearchResult, error) {
 	if !isFzfAvailable() {
-		return nil, fmt.Errorf("fzf is not installed. Please install fzf to use interactive search")
+		return nil, fmt.Errorf("fzf is not installed")
 	}
-
-	// Prepare the input for fzf
-	input := prepareSearchInput(results)
 
 	// Configure fzf command
 	cmd := exec.Command("fzf", buildFzfArgs(opts)...)
@@ -64,11 +62,22 @@ func RunInteractiveSearch(results []SearchResult, opts SearchOptions) ([]SearchR
 		return nil, fmt.Errorf("failed to start fzf: %v", err)
 	}
 
-	// Write input to fzf
+	// Write results to fzf as they arrive
 	go func() {
 		defer stdin.Close()
-		for _, line := range input {
-			fmt.Fprintln(stdin, line)
+		for result := range resultsChan {
+			// Format the display text
+			displayText := formatDisplayText(result)
+
+			// Create a hidden JSON block after the display text using ANSI escape codes
+			jsonData, err := json.Marshal(result)
+			if err != nil {
+				continue
+			}
+
+			// Combine visible text with hidden data
+			line := fmt.Sprintf("%s\x1b[0m\x1b[30m%s\x1b[0m\n", displayText, string(jsonData))
+			stdin.Write([]byte(line))
 		}
 	}()
 
@@ -88,7 +97,7 @@ func RunInteractiveSearch(results []SearchResult, opts SearchOptions) ([]SearchR
 	}
 
 	// Process selected items
-	return processSearchOutput(output.String(), results)
+	return processSearchOutput(output.String(), nil)
 }
 
 func buildFzfArgs(opts SearchOptions) []string {
@@ -235,7 +244,7 @@ func prepareSearchInput(results []SearchResult) []string {
 	for _, result := range results {
 		// Format the display text first
 		displayText := formatDisplayText(result)
-		
+
 		// Create a hidden JSON block after the display text using ANSI escape codes
 		jsonData, err := json.Marshal(result)
 		if err != nil {
@@ -255,13 +264,13 @@ func formatDisplayText(result SearchResult) string {
 	repo := truncateString(result.Repository, 15)
 	message := truncateMessage(result.Message, 50)
 	changes := fmt.Sprintf("+%d/-%d", result.Additions, result.Deletions)
-	
+
 	// Color scheme
-	dateColor := "\x1b[38;5;242m" // Gray
+	dateColor := "\x1b[38;5;242m"   // Gray
 	authorColor := "\x1b[38;5;214m" // Orange
-	repoColor := "\x1b[38;5;039m" // Blue
-	msgColor := "\x1b[38;5;252m"  // Light gray
-	statsColor := "\x1b[38;5;035m" // Green
+	repoColor := "\x1b[38;5;039m"   // Blue
+	msgColor := "\x1b[38;5;252m"    // Light gray
+	statsColor := "\x1b[38;5;035m"  // Green
 	reset := "\x1b[0m"
 
 	// Format: date author repository: message (+x/-y)
@@ -286,11 +295,11 @@ func truncateString(s string, maxLen int) string {
 func truncateMessage(msg string, maxLen int) string {
 	msg = strings.TrimSpace(msg)
 	msg = strings.ReplaceAll(msg, "\n", " ")
-	
+
 	if len(msg) <= maxLen {
 		return msg
 	}
-	
+
 	return msg[:maxLen-3] + "..."
 }
 
@@ -314,4 +323,4 @@ func processSearchOutput(output string, _ []SearchResult) ([]SearchResult, error
 func isFzfAvailable() bool {
 	_, err := exec.LookPath("fzf")
 	return err == nil
-} 
+}
