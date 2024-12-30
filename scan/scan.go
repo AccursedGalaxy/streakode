@@ -68,14 +68,115 @@ type RepoMetadata struct {
 
 }
 
-/*
-TODO:
-- Rethink Time Management.
--> Currently we are just going 7 days back for last week and 24 hours back for last day, etc.
--> We should consider switching to a more date-based approach.
---> This would allow for a more "real" way of displaying the output.
---> Also, might make more sense from a user perspective.
-*/
+// DateRange represents a time period with start and end dates
+type DateRange struct {
+	Start time.Time
+	End   time.Time
+}
+
+// GetCurrentWeekRange returns the date range for the current week (Monday to Sunday)
+func GetCurrentWeekRange() DateRange {
+	now := time.Now()
+	
+	// Find the most recent Monday
+	weekday := now.Weekday()
+	daysFromMonday := int(weekday)
+	if weekday == time.Sunday {
+		daysFromMonday = 7
+	}
+	
+	// Calculate start of week (Monday at 00:00:00)
+	startDate := now.AddDate(0, 0, -daysFromMonday+1)
+	startDate = time.Date(startDate.Year(), startDate.Month(), startDate.Day(), 0, 0, 0, 0, startDate.Location())
+	
+	// Calculate end of week (next Monday at 00:00:00)
+	endDate := startDate.AddDate(0, 0, 7)
+	
+	return DateRange{Start: startDate, End: endDate}
+}
+
+// GetPreviousWeekRange returns the date range for the previous week (Monday to Sunday)
+func GetPreviousWeekRange() DateRange {
+	currentWeek := GetCurrentWeekRange()
+	return DateRange{
+		Start: currentWeek.Start.AddDate(0, 0, -7),
+		End:   currentWeek.Start,
+	}
+}
+
+// GetMonthRange returns the date range for the specified number of months back
+func GetMonthRange(monthsBack int) DateRange {
+	now := time.Now()
+	
+	// Calculate start of the target month
+	startDate := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+	startDate = startDate.AddDate(0, -monthsBack, 0)
+	
+	// Calculate end of the month (23:59:59 of the last day)
+	endDate := time.Date(startDate.Year(), startDate.Month()+1, 1, 0, 0, 0, 0, startDate.Location())
+	endDate = endDate.Add(-time.Second) // Move to 23:59:59 of the previous day
+	
+	return DateRange{Start: startDate, End: endDate}
+}
+
+// IsInDateRange checks if a date falls within a date range (inclusive start, exclusive end)
+func IsInDateRange(date time.Time, dateRange DateRange) bool {
+	return (date.Equal(dateRange.Start) || date.After(dateRange.Start)) && date.Before(dateRange.End)
+}
+
+// countCommitsInRange counts commits within a specific date range
+func countCommitsInRange(dates []string, dateRange DateRange) int {
+	count := 0
+	for _, dateStr := range dates {
+		commitDate, err := time.Parse("2006-01-02 15:04:05 -0700", dateStr)
+		if err != nil {
+			continue
+		}
+
+		if IsInDateRange(commitDate, dateRange) {
+			count++
+		}
+	}
+	return count
+}
+
+// Refactored version of countLastWeeksCommits using date ranges
+func countLastWeeksCommits(dates []string) int {
+	previousWeek := GetPreviousWeekRange()
+	if config.AppConfig.Debug {
+		fmt.Printf("Debug: Previous week range: %s to %s\n", 
+			previousWeek.Start.Format("2006-01-02 (Monday)"), 
+			previousWeek.End.Format("2006-01-02 (Monday)"))
+	}
+	return countCommitsInRange(dates, previousWeek)
+}
+
+// Refactored version of countRecentCommits using date ranges
+func countRecentCommits(dates []string, days int) int {
+	now := time.Now()
+	dateRange := DateRange{
+		Start: now.AddDate(0, 0, -days),
+		End:   now,
+	}
+	if config.AppConfig.Debug {
+		fmt.Printf("Debug: Recent commits range: %s to %s\n",
+			dateRange.Start.Format("2006-01-02"),
+			dateRange.End.Format("2006-01-02"))
+	}
+	return countCommitsInRange(dates, dateRange)
+}
+
+// Refactored version of countCommitsInPeriod using DateRange
+func countCommitsInPeriod(history []CommitHistory, start, end time.Time) int {
+    dateRange := DateRange{Start: start, End: end}
+    count := 0
+    for _, commit := range history {
+        if IsInDateRange(commit.Date, dateRange) {
+            count++
+        }
+    }
+    return count
+}
 
 // fetchRepoMeta - gets metadata for a single repository and verifies user
 func fetchRepoMeta(repoPath, author string) RepoMetadata {
@@ -328,49 +429,6 @@ func calculateStreakInfo(dates []string) StreakInfo {
 	return StreakInfo{currentStreak, longestStreak}
 }
 
-// TODO: Get Number of Commits Last week
-func countLastWeeksCommits(dates []string) int {
-	now := time.Now()
-	endLastWeek := now.AddDate(0, 0, -7) // Goes 7 days back for "End of Last Week"
-	startLastWeek := endLastWeek.AddDate(0, 0, -7) // Goes 14 Days back for "Start of Last Week"
-
-	count := 0
-	for _, dateStr := range dates {
-		commitDate, err := time.Parse("2006-01-02 15:04:05 -0700", dateStr)
-		if err != nil {
-			continue
-		}
-
-		// Count all commits within the time range
-		if commitDate.After(startLastWeek) && commitDate.Before(endLastWeek) {
-			count++
-		}
-	}
-
-	return count
-}
-
-// countRecentCommits - counts the number of commits in the last n days
-func countRecentCommits(dates []string, days int) int {
-	now := time.Now()
-	cutoff := now.AddDate(0, 0, -days)
-
-	count := 0
-	for _, dateStr := range dates {
-		commitDate, err := time.Parse("2006-01-02 15:04:05 -0700", dateStr)
-		if err != nil {
-			continue
-		}
-
-		// Count all commits within the time range
-		if commitDate.After(cutoff) && commitDate.Before(now) {
-			count++
-		}
-	}
-
-	return count
-}
-
 // FindMostActiveDay - finds the most active day in the last n days
 func findMostActiveDay(dates []string) string {
 	dayCount := make(map[string]int)
@@ -552,15 +610,4 @@ func (m *RepoMetadata) CalculateVelocity() VelocityMetrics {
     metrics.PeakHours = m.CalculatePeakHours()
 
     return metrics
-}
-
-// Helper function to count commits in a time period
-func countCommitsInPeriod(history []CommitHistory, start, end time.Time) int {
-    count := 0
-    for _, commit := range history {
-        if commit.Date.After(start) && commit.Date.Before(end) {
-            count++
-        }
-    }
-    return count
 }

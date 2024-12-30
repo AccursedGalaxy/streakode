@@ -91,34 +91,44 @@ func requiresFreshData() bool {
 }
 
 func main() {
-	var profile string
+	var (
+		profile string
+		debug   bool
+	)
 
 	rootCmd := &cobra.Command{
 		Use:   "streakode",
 		Short: "A Git activity tracker for monitoring coding streaks",
-			Version: Version,
-			PersistentPreRun: func(cmd *cobra.Command, args []string) {
-				// Load the state first to get the active profile
-				if err := config.LoadState(); err != nil {
-					fmt.Printf("Error loading state: %v\n", err)
-				}
+		Version: Version,
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			// Load the state first to get the active profile
+			if err := config.LoadState(); err != nil {
+				fmt.Printf("Error loading state: %v\n", err)
+			}
 
-				// Use AppState.ActiveProfile instead of the profile flag
-				cacheFilePath := getCacheFilePath(config.AppState.ActiveProfile)
-				config.LoadConfig(config.AppState.ActiveProfile)
-				cache.InitCache()
-				if err := cache.LoadCache(cacheFilePath); err != nil {
-					fmt.Printf("Error loading cache: %v\n", err)
-				}
+			// Set debug mode from flag
+			config.AppConfig.Debug = debug
+			if debug {
+				fmt.Println("Debug mode enabled")
+			}
 
-				if err := ensureCacheRefresh(); err != nil {
-					fmt.Printf("Error refreshing cache: %v\n", err)
-				}
-			},
+			// Use AppState.ActiveProfile instead of the profile flag
+			cacheFilePath := getCacheFilePath(config.AppState.ActiveProfile)
+			config.LoadConfig(config.AppState.ActiveProfile)
+			cache.InitCache()
+			if err := cache.LoadCache(cacheFilePath); err != nil {
+				fmt.Printf("Error loading cache: %v\n", err)
+			}
+
+			if err := ensureCacheRefresh(); err != nil {
+				fmt.Printf("Error refreshing cache: %v\n", err)
+			}
+		},
 	}
 
-	// Add profile flag to root command
+	// Add persistent flags to root command
 	rootCmd.PersistentFlags().StringVarP(&profile, "profile", "p", "", "Config profile to use (e.g., work, home)")
+	rootCmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "Enable debug mode")
 
 	statsCmd := &cobra.Command{
 		Use: "stats",
@@ -138,6 +148,9 @@ func main() {
 		Use:   "reload",
 		Short: "Reload the streakode cache with fresh data",
 		Run: func(cobraCmd *cobra.Command, args []string) {
+			if config.AppConfig.Debug {
+				fmt.Println("Debug: Starting cache reload...")
+			}
 			cacheFilePath := getCacheFilePath(profile)
 			err := cache.RefreshCache(
 				config.AppConfig.ScanDirectories,
@@ -158,6 +171,9 @@ func main() {
 		Use:   "clean",
 		Short: "Remove the streakode cache",
 		Run: func(cobraCmd *cobra.Command, args []string) {
+			if config.AppConfig.Debug {
+				fmt.Println("Debug: Starting cache cleanup...")
+			}
 			cacheFilePath := getCacheFilePath(profile)
 			if err := cache.CleanCache(cacheFilePath); err != nil {
 				fmt.Printf("Error cleaning cache: %v\n", err)

@@ -161,6 +161,11 @@ streakode author
 # Show statistics
 streakode stats
 
+# Show statistics with debug output
+streakode stats --debug
+# or
+streakode stats -d
+
 # Refresh repository cache
 streakode cache reload
 
@@ -171,6 +176,20 @@ streakode cache clean
 streakode profile work    # Switch to work profile
 streakode profile home    # Switch to home profile
 streakode profile default # Switch to default profile
+```
+
+### Debug Mode
+
+You can enable debug mode for any command by adding the `--debug` or `-d` flag. This will show additional information about:
+- Date ranges being used for calculations
+- Configuration file being used
+- Cache operations
+- And other helpful debugging information
+
+Example:
+```bash
+streakode stats --debug
+streakode cache reload -d
 ```
 
 ## Updating 🔄

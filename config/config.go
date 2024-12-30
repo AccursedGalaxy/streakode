@@ -62,6 +62,7 @@ type Config struct {
 		HeaderColor  string `mapstructure:"header_color"`
 	}
 	DetailedStats bool `mapstructure:"detailed_stats"`
+	Debug         bool `mapstructure:"debug"`
 	LanguageSettings struct {
 		ExcludedExtensions []string `mapstructure:"excluded_extensions"` // e.g., [".yaml", ".txt", ".md"]
 		ExcludedLanguages  []string `mapstructure:"excluded_languages"`  // e.g., ["YAML", "Text", "Markdown"]
@@ -262,5 +263,97 @@ func LoadConfig(profile string) {
 			}
 			AppConfig.ScanDirectories[i] = filepath.Join(home, dir[2:])
 		}
+	}
+}
+
+// InitConfig reads in config file and ENV variables if set.
+func InitConfig(cfgFile string) {
+	if cfgFile != "" {
+		// Use config file from the flag.
+		viper.SetConfigFile(cfgFile)
+	} else {
+		// Find home directory.
+		home, err := os.UserHomeDir()
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		// Search config in home directory with name ".streakodeconfig" (without extension).
+		viper.AddConfigPath(home)
+		viper.SetConfigType("yaml")
+		viper.SetConfigName(".streakodeconfig")
+	}
+
+	viper.AutomaticEnv() // read in environment variables that match
+
+	// If a config file is found, read it in.
+	if err := viper.ReadInConfig(); err == nil {
+		if AppConfig.Debug {
+			fmt.Println("Using config file:", viper.ConfigFileUsed())
+		}
+	}
+
+	if err := viper.Unmarshal(&AppConfig); err != nil {
+		fmt.Println("Error parsing config:", err)
+		os.Exit(1)
+	}
+
+	// Set default values after unmarshal
+	setDefaults()
+}
+
+// setDefaults sets default values for configuration options
+func setDefaults() {
+	// Set default dormant threshold if not specified
+	if AppConfig.DormantThreshold <= 0 {
+		AppConfig.DormantThreshold = 30 // 30 days default
+	}
+
+	// Set default refresh interval if not specified
+	if AppConfig.RefreshInterval <= 0 {
+		AppConfig.RefreshInterval = 60 // 60 minutes default
+	}
+
+	// Set default activity indicators if not specified
+	if AppConfig.DisplayStats.ActivityIndicators.HighActivity == "" {
+		AppConfig.DisplayStats.ActivityIndicators.HighActivity = "🔥"
+	}
+	if AppConfig.DisplayStats.ActivityIndicators.NormalActivity == "" {
+		AppConfig.DisplayStats.ActivityIndicators.NormalActivity = "⚡"
+	}
+	if AppConfig.DisplayStats.ActivityIndicators.NoActivity == "" {
+		AppConfig.DisplayStats.ActivityIndicators.NoActivity = "💤"
+	}
+	if AppConfig.DisplayStats.ActivityIndicators.StreakRecord == "" {
+		AppConfig.DisplayStats.ActivityIndicators.StreakRecord = "🏆"
+	}
+	if AppConfig.DisplayStats.ActivityIndicators.ActiveStreak == "" {
+		AppConfig.DisplayStats.ActivityIndicators.ActiveStreak = "🔥"
+	}
+
+	// Set default thresholds
+	if AppConfig.DisplayStats.Thresholds.HighActivity <= 0 {
+		AppConfig.DisplayStats.Thresholds.HighActivity = 10
+	}
+
+	// Set default insight settings
+	if AppConfig.DisplayStats.InsightSettings.TopLanguagesCount <= 0 {
+		AppConfig.DisplayStats.InsightSettings.TopLanguagesCount = 3
+	}
+
+	// Set default language settings
+	if AppConfig.LanguageSettings.MinimumLines < 0 {
+		AppConfig.LanguageSettings.MinimumLines = 0
+	}
+
+	// Set default header color if not specified
+	if AppConfig.Colors.HeaderColor == "" {
+		AppConfig.Colors.HeaderColor = "#FF69B4"
+	}
+
+	// Set default max projects if not specified
+	if AppConfig.DisplayStats.MaxProjects <= 0 {
+		AppConfig.DisplayStats.MaxProjects = 10
 	}
 }

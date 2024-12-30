@@ -185,4 +185,188 @@ func TestCountRecentCommits(t *testing.T) {
 			assert.Equal(t, tt.expected, count)
 		})
 	}
+}
+
+func TestDateRanges(t *testing.T) {
+	tests := []struct {
+		name     string
+		setup    func() DateRange
+		validate func(*testing.T, DateRange)
+	}{
+		{
+			name: "Current week range starts on Monday and ends on Sunday",
+			setup: func() DateRange {
+				return GetCurrentWeekRange()
+			},
+			validate: func(t *testing.T, dr DateRange) {
+				assert.Equal(t, time.Monday, dr.Start.Weekday(), "Week should start on Monday")
+				assert.Equal(t, time.Sunday, dr.End.AddDate(0, 0, -1).Weekday(), "Week should end on Sunday")
+				
+				// Verify time components
+				assert.Equal(t, 0, dr.Start.Hour(), "Start hour should be 0")
+				assert.Equal(t, 0, dr.Start.Minute(), "Start minute should be 0")
+				assert.Equal(t, 0, dr.Start.Second(), "Start second should be 0")
+				
+				// Verify range is exactly 7 days
+				diff := dr.End.Sub(dr.Start)
+				assert.Equal(t, 7*24*time.Hour, diff, "Week range should be exactly 7 days")
+			},
+		},
+		{
+			name: "Previous week range is 7 days before current week",
+			setup: func() DateRange {
+				return GetPreviousWeekRange()
+			},
+			validate: func(t *testing.T, dr DateRange) {
+				currentWeek := GetCurrentWeekRange()
+				assert.Equal(t, currentWeek.Start, dr.End, "Previous week should end where current week starts")
+				assert.Equal(t, time.Monday, dr.Start.Weekday(), "Previous week should start on Monday")
+				
+				// Verify range is exactly 7 days
+				diff := dr.End.Sub(dr.Start)
+				assert.Equal(t, 7*24*time.Hour, diff, "Week range should be exactly 7 days")
+			},
+		},
+		{
+			name: "Month range covers exact calendar month",
+			setup: func() DateRange {
+				return GetMonthRange(1) // Get previous month
+			},
+			validate: func(t *testing.T, dr DateRange) {
+				// Verify start date is first day of month at 00:00:00
+				assert.Equal(t, 1, dr.Start.Day(), "Month should start on day 1")
+				assert.Equal(t, 0, dr.Start.Hour(), "Start hour should be 0")
+				assert.Equal(t, 0, dr.Start.Minute(), "Start minute should be 0")
+				assert.Equal(t, 0, dr.Start.Second(), "Start second should be 0")
+				
+				// Verify end date is last day of month at 23:59:59
+				nextMonth := dr.Start.AddDate(0, 1, 0)
+				expectedLastDay := nextMonth.AddDate(0, 0, -1)
+				assert.Equal(t, expectedLastDay.Day(), dr.End.Day(), "Should end on last day of month")
+				assert.Equal(t, 23, dr.End.Hour(), "End hour should be 23")
+				assert.Equal(t, 59, dr.End.Minute(), "End minute should be 59")
+				assert.Equal(t, 59, dr.End.Second(), "End second should be 59")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dateRange := tt.setup()
+			tt.validate(t, dateRange)
+		})
+	}
+}
+
+func TestCountCommitsInRange(t *testing.T) {
+	// Create a fixed reference date for testing
+	referenceDate, _ := time.Parse("2006-01-02", "2024-01-15") // A Monday
+	
+	// Create test dates spanning multiple weeks
+	dates := []string{
+		referenceDate.Format("2006-01-02 15:04:05 -0700"),                              // Monday (current week)
+		referenceDate.AddDate(0, 0, 1).Format("2006-01-02 15:04:05 -0700"),            // Tuesday (current week)
+		referenceDate.AddDate(0, 0, -5).Format("2006-01-02 15:04:05 -0700"),           // Previous week (Wednesday)
+		referenceDate.AddDate(0, 0, -12).Format("2006-01-02 15:04:05 -0700"),          // Two weeks ago
+		referenceDate.AddDate(0, -1, 0).Format("2006-01-02 15:04:05 -0700"),           // Last month
+	}
+
+	tests := []struct {
+		name     string
+		dates    []string
+		getRange func(time.Time) DateRange
+		want     int
+	}{
+		{
+			name:  "Current week commits",
+			dates: dates,
+			getRange: func(now time.Time) DateRange {
+				return DateRange{
+					Start: now,                              // Monday
+					End:   now.AddDate(0, 0, 7),            // Next Monday
+				}
+			},
+			want: 2, // Monday and Tuesday of current week
+		},
+		{
+			name:  "Previous week commits",
+			dates: dates,
+			getRange: func(now time.Time) DateRange {
+				return DateRange{
+					Start: now.AddDate(0, 0, -7),           // Previous Monday
+					End:   now,                             // Current Monday
+				}
+			},
+			want: 1, // One commit from previous week
+		},
+		{
+			name:  "Last month commits",
+			dates: dates,
+			getRange: func(now time.Time) DateRange {
+				return DateRange{
+					Start: time.Date(now.Year(), now.Month()-1, 1, 0, 0, 0, 0, now.Location()),
+					End:   time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location()),
+				}
+			},
+			want: 1, // One commit from last month
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dateRange := tt.getRange(referenceDate)
+			got := countCommitsInRange(tt.dates, dateRange)
+			assert.Equal(t, tt.want, got, "Expected %d commits in range, got %d\nRange: %s to %s", 
+				tt.want, got, 
+				dateRange.Start.Format("2006-01-02 (Mon)"),
+				dateRange.End.Format("2006-01-02 (Mon)"))
+		})
+	}
+}
+
+func TestIsInDateRange(t *testing.T) {
+	now := time.Now()
+	dateRange := DateRange{
+		Start: now.AddDate(0, 0, -7),
+		End:   now,
+	}
+
+	tests := []struct {
+		name     string
+		date     time.Time
+		want     bool
+	}{
+		{
+			name: "Date within range",
+			date: now.AddDate(0, 0, -3),
+			want: true,
+		},
+		{
+			name: "Date at start of range",
+			date: dateRange.Start,
+			want: true,
+		},
+		{
+			name: "Date at end of range",
+			date: dateRange.End,
+			want: false,
+		},
+		{
+			name: "Date before range",
+			date: now.AddDate(0, 0, -8),
+			want: false,
+		},
+		{
+			name: "Date after range",
+			date: now.AddDate(0, 0, 1),
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsInDateRange(tt.date, dateRange)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 } 
