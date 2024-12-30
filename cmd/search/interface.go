@@ -124,48 +124,41 @@ func buildFzfArgs(opts SearchOptions) []string {
 func buildPreviewCmd() string {
 	return `
 # Extract JSON data from the hidden part of the line
-# First, get everything after the visible text (after the last reset sequence)
 JSON=$(echo {} | sed 's/.*\x1b\[0m\x1b\[30m\(.*\)\x1b\[0m/\1/')
 HASH=$(echo "$JSON" | grep -o '"hash":"[^"]*"' | cut -d'"' -f4)
 REPO=$(echo "$JSON" | grep -o '"repository":"[^"]*"' | cut -d'"' -f4)
 
-if [ -n "$HASH" ]; then
-	# Try to get commit info from the repository directory
-	cd $(git rev-parse --show-toplevel 2>/dev/null) || true
-	
-	if git show --no-patch --format="%H" $HASH >/dev/null 2>&1; then
-		# Commit exists locally
-		echo -e "\033[1;36m# Commit Details\033[0m"
-		git show --color=always --stat $HASH 2>/dev/null
-		
-		echo -e "\n\033[1;36m# Full Commit Message\033[0m"
-		git show -s --format=%B $HASH 2>/dev/null
-		
-		echo -e "\n\033[1;36m# Changed Files\033[0m"
-		git show --name-status --color=always $HASH 2>/dev/null
-		
-		echo -e "\n\033[1;36m# Diff Summary\033[0m"
-		git show --color=always --stat $HASH 2>/dev/null
-		
-		if [ -n "$REPO" ]; then
-			echo -e "\n\033[1;36m# Repository Context\033[0m"
-			echo "Repository: $REPO"
-			# Show branch information
-			BRANCH=$(git branch --contains $HASH 2>/dev/null | grep '*' | cut -d' ' -f2)
-			if [ -n "$BRANCH" ]; then
-				echo "Branch: $BRANCH"
-			fi
-			# Show relative position
-			POSITION=$(git rev-list --count HEAD..$HASH 2>/dev/null || echo "0")
-			if [ "$POSITION" != "0" ]; then
-				echo "Position: $POSITION commits ahead"
-			fi
+if [ -n "$HASH" ] && [ -n "$REPO" ]; then
+	# Try to find the repository in common parent directories
+	REPO_PATH=""
+	CURRENT_DIR="$PWD"
+	while [ "$CURRENT_DIR" != "/" ]; do
+		if [ -d "$CURRENT_DIR/$REPO" ]; then
+			REPO_PATH="$CURRENT_DIR/$REPO"
+			break
+		elif [ -d "$CURRENT_DIR/$REPO/.git" ]; then
+			REPO_PATH="$CURRENT_DIR/$REPO"
+			break
 		fi
-	else
-		# Try to fetch the commit
-		echo -e "\033[1;33mFetching commit data...\033[0m"
-		git fetch -f origin $HASH 2>/dev/null
+		CURRENT_DIR=$(dirname "$CURRENT_DIR")
+	done
+
+	# If repo not found in parent dirs, try common paths
+	if [ -z "$REPO_PATH" ]; then
+		for DIR in "$HOME/github" "$HOME/git" "$HOME/code" "$HOME/projects" "$HOME/workspace" "$HOME/dev"; do
+			if [ -d "$DIR/$REPO" ]; then
+				REPO_PATH="$DIR/$REPO"
+				break
+			fi
+		done
+	fi
+
+	if [ -n "$REPO_PATH" ]; then
+		cd "$REPO_PATH"
+		
+		# Try to get commit info
 		if git show --no-patch --format="%H" $HASH >/dev/null 2>&1; then
+			# Commit exists locally
 			echo -e "\033[1;36m# Commit Details\033[0m"
 			git show --color=always --stat $HASH 2>/dev/null
 			
@@ -177,19 +170,63 @@ if [ -n "$HASH" ]; then
 			
 			echo -e "\n\033[1;36m# Diff Summary\033[0m"
 			git show --color=always --stat $HASH 2>/dev/null
+			
+			echo -e "\n\033[1;36m# Repository Context\033[0m"
+			echo "Repository: $REPO"
+			echo "Location: $REPO_PATH"
+			
+			# Show branch information
+			BRANCH=$(git branch --contains $HASH 2>/dev/null | grep '*' | cut -d' ' -f2)
+			if [ -n "$BRANCH" ]; then
+				echo "Branch: $BRANCH"
+			fi
 		else
-			echo "Commit not found in current repository"
+			# Try to fetch the commit
+			echo -e "\033[1;33mFetching commit data from $REPO...\033[0m"
+			git fetch -f origin $HASH 2>/dev/null
+			if git show --no-patch --format="%H" $HASH >/dev/null 2>&1; then
+				echo -e "\033[1;36m# Commit Details\033[0m"
+				git show --color=always --stat $HASH 2>/dev/null
+				
+				echo -e "\n\033[1;36m# Full Commit Message\033[0m"
+				git show -s --format=%B $HASH 2>/dev/null
+				
+				echo -e "\n\033[1;36m# Changed Files\033[0m"
+				git show --name-status --color=always $HASH 2>/dev/null
+				
+				echo -e "\n\033[1;36m# Diff Summary\033[0m"
+				git show --color=always --stat $HASH 2>/dev/null
+			else
+				echo -e "\033[1;31mCommit not found in repository: $REPO\033[0m"
+				echo "This might be because:"
+				echo "1. The commit was squashed or rebased"
+				echo "2. The repository needs to be fetched"
+				echo "3. The commit exists in a different branch"
+				echo -e "\nTry running: cd $REPO_PATH && git fetch --all"
+			fi
 		fi
-	fi
-	
-	# Add GitHub link if available
-	if git remote -v >/dev/null 2>&1; then
-		remote_url=$(git remote get-url origin 2>/dev/null)
-		if [[ $remote_url == *"github.com"* ]]; then
-			echo -e "\n\033[1;36m# Remote Info\033[0m"
-			echo "View on GitHub: https://github.com/$(echo $remote_url | sed 's/.*github.com[:/]//; s/\.git$//')/commit/$HASH"
+		
+		# Add GitHub link if available
+		if git remote -v >/dev/null 2>&1; then
+			remote_url=$(git remote get-url origin 2>/dev/null)
+			if [[ $remote_url == *"github.com"* ]]; then
+				echo -e "\n\033[1;36m# Remote Info\033[0m"
+				echo "View on GitHub: https://github.com/$(echo $remote_url | sed 's/.*github.com[:/]//; s/\.git$//')/commit/$HASH"
+			fi
 		fi
+	else
+		echo -e "\033[1;31mRepository not found: $REPO\033[0m"
+		echo "Please make sure the repository is cloned and in one of these locations:"
+		echo "- Current directory or parent directories"
+		echo "- ~/github"
+		echo "- ~/git"
+		echo "- ~/code"
+		echo "- ~/projects"
+		echo "- ~/workspace"
+		echo "- ~/dev"
 	fi
+else
+	echo "Could not extract commit information from selection"
 fi`
 }
 
