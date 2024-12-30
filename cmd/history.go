@@ -67,9 +67,6 @@ func DisplayHistory(opts HistoryOptions) {
 }
 
 func loadCommitsProgressively(opts HistoryOptions, commitChan chan<- CommitSummary, doneChan chan<- bool) {
-	defer close(commitChan)
-	defer close(doneChan)
-
 	var wg sync.WaitGroup
 	since := time.Now().AddDate(0, 0, -opts.Days)
 
@@ -89,24 +86,29 @@ func loadCommitsProgressively(opts HistoryOptions, commitChan chan<- CommitSumma
 		}
 
 		wg.Add(1)
+		sem <- struct{}{} // Acquire semaphore
 		go func(repoPath string) {
 			defer wg.Done()
-			sem <- struct{}{}        // Acquire semaphore
 			defer func() { <-sem }() // Release semaphore
 
 			repoName := extractRepoName(repoPath)
-
-			// Get local commits first (faster)
 			localCommits := getLocalCommitsOptimized(repoPath, opts, since)
 			for _, commit := range localCommits {
 				commit.Repository = repoName
-				commitChan <- commit
+				select {
+				case commitChan <- commit:
+				default:
+					// Channel might be closed, skip
+					return
+				}
 			}
 
 			// Only fetch remote data if needed and not too many local commits
 			if len(localCommits) < 100 && shouldFetchRemote(repoPath) {
 				// Fetch remote data in background
+				wg.Add(1)
 				go func() {
+					defer wg.Done()
 					fetchRemoteData(repoPath)
 					remoteCommits := getRemoteCommitsOptimized(repoPath, opts, since)
 					// Only send remote commits that aren't in local
@@ -117,7 +119,12 @@ func loadCommitsProgressively(opts HistoryOptions, commitChan chan<- CommitSumma
 					for _, commit := range remoteCommits {
 						if !seenHashes[commit.Hash] {
 							commit.Repository = repoName
-							commitChan <- commit
+							select {
+							case commitChan <- commit:
+							default:
+								// Channel might be closed, skip
+								return
+							}
 						}
 					}
 				}()
@@ -126,8 +133,11 @@ func loadCommitsProgressively(opts HistoryOptions, commitChan chan<- CommitSumma
 		return true
 	})
 
+	// Wait for all goroutines to complete before closing channels
 	wg.Wait()
 	doneChan <- true
+	close(commitChan)
+	close(doneChan)
 }
 
 func getCachedCommits(opts HistoryOptions, since time.Time) []CommitSummary {
