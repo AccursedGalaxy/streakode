@@ -313,11 +313,75 @@ Example:
 		},
 	}
 
+	// Add history command
+	historyCmd := &cobra.Command{
+		Use:   "history [repository]",
+		Short: "Display Git commit history with detailed information",
+		Long: `Display Git commit history with detailed information about commits, changes, and activity.
+
+This command allows you to view commit history with various filtering options:
+- Filter by repository name
+- Filter by author name
+- Choose the number of days to look back
+- Show detailed information including commit hashes and file counts
+
+The history is gathered from your configured scan directories and cached data.
+Use 'streakode cache reload' if you need to refresh the data.`,
+		Example: `  # Show history for all repositories in the last 7 days
+  streakode history --detailed
+
+  # Show history for a specific repository
+  streakode history myrepo
+
+  # Show detailed history for a specific author in the last 14 days
+  streakode history -a "John Doe" --detailed --days 14
+
+  # Show basic history for your current repositories
+  streakode history --days 30`,
+		Args: cobra.MaximumNArgs(1),
+		Run: func(cobraCmd *cobra.Command, args []string) {
+			// Show help if no arguments or flags are provided
+			if len(args) == 0 && !cobraCmd.Flags().Changed("author") && 
+			   !cobraCmd.Flags().Changed("detailed") && !cobraCmd.Flags().Changed("days") {
+				cobraCmd.Help()
+				return
+			}
+
+			var opts cmd.HistoryOptions
+
+			// Get flags
+			author, _ := cobraCmd.Flags().GetString("author")
+			detailed, _ := cobraCmd.Flags().GetBool("detailed")
+			days, _ := cobraCmd.Flags().GetInt("days")
+
+			// Set options
+			opts.Author = author
+			opts.Detailed = detailed
+			opts.Days = days
+			if days == 0 {
+				opts.Days = 7 // default to 7 days
+			}
+
+			// Set repository if provided
+			if len(args) > 0 {
+				opts.Repository = args[0]
+			}
+
+			cmd.DisplayHistory(opts)
+		},
+	}
+
+	// Add flags to history command
+	historyCmd.Flags().StringP("author", "a", "", "Filter history by author")
+	historyCmd.Flags().Bool("detailed", false, "Show detailed commit information")
+	historyCmd.Flags().Int("days", 7, "Number of days of history to show")
+
 	// Add all commands to root
 	rootCmd.AddCommand(statsCmd)
 	rootCmd.AddCommand(cacheCmd)
 	rootCmd.AddCommand(profileCmd)
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(authorCmd)
+	rootCmd.AddCommand(historyCmd)
 	rootCmd.Execute()
 }
