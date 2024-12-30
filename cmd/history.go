@@ -14,6 +14,7 @@ import (
 	"github.com/AccursedGalaxy/streakode/cache"
 	"github.com/AccursedGalaxy/streakode/cmd/search"
 	"github.com/AccursedGalaxy/streakode/config"
+	"github.com/AccursedGalaxy/streakode/scan"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"golang.org/x/term"
@@ -109,11 +110,11 @@ func displayInteractiveHistory(commits []CommitSummary, opts HistoryOptions) {
 
 func handleSelectedCommits(commits []search.SearchResult) {
 	fmt.Printf("\nSelected %d commits:\n\n", len(commits))
-	
+
 	t := table.NewWriter()
 	t.SetStyle(table.StyleRounded)
 	t.AppendHeader(table.Row{"Date", "Repository", "Message", "Changes"})
-	
+
 	for _, commit := range commits {
 		t.AppendRow(table.Row{
 			commit.Date.Format("2006-01-02 15:04"),
@@ -122,7 +123,7 @@ func handleSelectedCommits(commits []search.SearchResult) {
 			fmt.Sprintf("+%d/-%d", commit.Additions, commit.Deletions),
 		})
 	}
-	
+
 	fmt.Println(t.Render())
 }
 
@@ -139,9 +140,9 @@ func getCommitHistory(opts HistoryOptions) []CommitSummary {
 
 	// Process repositories concurrently
 	activeRepos := 0
-	for path := range cache.Cache {
+	cache.Cache.Range(func(path string, repo scan.RepoMetadata) bool {
 		if opts.Repository != "" && !matchesRepository(path, opts.Repository) {
-			continue
+			return true
 		}
 		activeRepos++
 
@@ -171,7 +172,9 @@ func getCommitHistory(opts HistoryOptions) []CommitSummary {
 
 			results <- result
 		}(path)
-	}
+
+		return true
+	})
 
 	// Collect results
 	for i := 0; i < activeRepos; i++ {
@@ -220,7 +223,7 @@ func fetchRemoteData(repoPath string) {
 
 func getLocalCommits(repoPath string, opts HistoryOptions, since time.Time) []CommitSummary {
 	var commits []CommitSummary
-	
+
 	// Build optimized git log command
 	args := []string{
 		"-C", repoPath,
@@ -270,7 +273,7 @@ func getRemoteCommits(repoPath string, opts HistoryOptions, since time.Time) []C
 	}
 
 	branches := strings.Split(string(output), "\n")
-	
+
 	// Process each branch concurrently
 	type branchResult struct {
 		commits []CommitSummary
@@ -285,7 +288,7 @@ func getRemoteCommits(repoPath string, opts HistoryOptions, since time.Time) []C
 
 		go func(branchName string) {
 			var result branchResult
-			
+
 			// Get commits from remote branch with timeout
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
@@ -541,4 +544,4 @@ func sortCommitsByDate(commits []CommitSummary) {
 	sort.Slice(commits, func(i, j int) bool {
 		return commits[i].Date.After(commits[j].Date)
 	})
-} 
+}

@@ -1,7 +1,6 @@
 package cache
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -14,147 +13,61 @@ import (
 	"github.com/AccursedGalaxy/streakode/scan"
 )
 
-// in-memory cache to hold repo metadata during runtime
+// Global cache manager instance
 var (
-	Cache    map[string]scan.RepoMetadata
-	metadata CacheMetadata
-	mutex    sync.RWMutex
+	manager *CacheManager
+	mutex   sync.RWMutex
 )
 
-type CacheMetadata struct {
-	LastRefresh time.Time
-	Version     string // For Future Version Tracking
-}
-
-// InitCache - Initializes the in memory cache
+// InitCache - Initializes the cache manager
 func InitCache() {
-	Cache = make(map[string]scan.RepoMetadata)
-}
+	mutex.Lock()
+	defer mutex.Unlock()
 
-// check if refresh is needed
-func ShouldAutoRefresh(refreshInterval time.Duration) bool {
-	mutex.RLock()
-	defer mutex.RUnlock()
-
-	if metadata.LastRefresh.IsZero() {
-		return true
+	if manager != nil {
+		return
 	}
-	return time.Since(metadata.LastRefresh) > refreshInterval
+
+	manager = NewCacheManager(getCacheFilePath())
+	if err := manager.Load(); err != nil {
+		log.Printf("Error loading cache: %v\n", err)
+	}
 }
 
-// LoadCache - loads repository metadata from a JSON cache file into memory
+// LoadCache - loads repository metadata from cache file
 func LoadCache(filePath string) error {
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	file, err := os.Open(filePath)
-	if os.IsNotExist(err) {
-		InitCache()
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("error opening cache file: %v", err)
-	}
-	defer file.Close()
-
-	decoder := json.NewDecoder(file)
-	if err := decoder.Decode(&Cache); err != nil {
-		InitCache()
-		return nil
+	if manager == nil {
+		manager = NewCacheManager(filePath)
 	}
 
-	// Load metadata from a separate file
-	metadataPath := filePath + ".meta"
-	metaFile, err := os.Open(metadataPath)
-	if os.IsNotExist(err) {
-		metadata = CacheMetadata{LastRefresh: time.Time{}}
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("error opening metadata file: %v", err)
-	}
-	defer metaFile.Close()
-
-	decoder = json.NewDecoder(metaFile)
-	if err := decoder.Decode(&metadata); err != nil {
-		metadata = CacheMetadata{LastRefresh: time.Time{}}
-		return nil
-	}
-
-	return nil
+	return manager.Load()
 }
 
-// SaveCache - saves the in-memory cache to a JSON file
+// SaveCache - saves the cache to disk
 func SaveCache(filePath string) error {
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	// Create directory if it doesn't exist
-	dir := filepath.Dir(filePath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("error creating directory: %v", err)
+	if manager == nil {
+		return fmt.Errorf("cache manager not initialized")
 	}
 
-	file, err := os.Create(filePath)
-	if err != nil {
-		return fmt.Errorf("error creating cache file: %v", err)
-	}
-	defer file.Close()
-
-	encoder := json.NewEncoder(file)
-	if err := encoder.Encode(Cache); err != nil {
-		return fmt.Errorf("error encoding cache: %v", err)
-	}
-
-	// Save metadata to a separate file
-	metadataPath := filePath + ".meta"
-	metaFile, err := os.Create(metadataPath)
-	if err != nil {
-		return fmt.Errorf("error creating metadata file: %v", err)
-	}
-	defer metaFile.Close()
-
-	metadata.LastRefresh = time.Now()
-	encoder = json.NewEncoder(metaFile)
-	if err := encoder.Encode(metadata); err != nil {
-		return fmt.Errorf("error encoding metadata: %v", err)
-	}
-
-	return nil
+	return manager.Save()
 }
 
-// Add new method to check if cache needs refresh
-func NeedsRefresh(path string, lastCommit time.Time) bool {
-	if cached, exists := Cache[path]; exists {
-		// Only refresh if new commits exist
-		return lastCommit.After(cached.LastCommit)
-	}
-	return true
-}
-
-// Clean Cache
-func CleanCache(cacheFilePath string) error {
-	//Reset in-memory cache
-	Cache = make(map[string]scan.RepoMetadata)
-
-	// Remove cache file if present
-	if err := os.Remove(cacheFilePath); err != nil {
-		if !os.IsNotExist(err) {
-			return fmt.Errorf("something went wrong removing the cache file: %v", err)
-		}
-	}
-
-	return nil
-}
-
-// Modified RefreshCache to support exclusions
+// RefreshCache - updates the cache with fresh data
 func RefreshCache(dirs []string, author string, cacheFilePath string, excludedPatterns []string, excludedPaths []string) error {
-	// Clean cache and handle potential errors
-	if err := CleanCache(cacheFilePath); err != nil {
-		return fmt.Errorf("failed to clean cache: %v", err)
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	if manager == nil {
+		manager = NewCacheManager(cacheFilePath)
 	}
 
-	// Create a function to check if a path should be excluded
+	// Create exclusion function
 	shouldExclude := func(path string) bool {
 		// Check full path exclusions
 		for _, excludedPath := range excludedPaths {
@@ -172,43 +85,22 @@ func RefreshCache(dirs []string, author string, cacheFilePath string, excludedPa
 		return false
 	}
 
-	// Filter out excluded directories before scanning
-	var filteredDirs []string
-	for _, dir := range dirs {
-		if !shouldExclude(dir) {
-			filteredDirs = append(filteredDirs, dir)
-		}
-	}
-
-	repos, err := scan.ScanDirectories(filteredDirs, author, shouldExclude)
+	// Scan directories for repositories
+	repos, err := scan.ScanDirectories(dirs, author, shouldExclude)
 	if err != nil {
-		log.Printf("Error scanning directories: %v", err)
-		return err
+		return fmt.Errorf("error scanning directories: %v", err)
 	}
 
-	// Only update changed repositories
+	// Convert repos slice to map
+	reposMap := make(map[string]scan.RepoMetadata)
 	for _, repo := range repos {
-		if NeedsRefresh(repo.Path, repo.LastCommit) {
-			Cache[repo.Path] = repo
-		}
+		reposMap[repo.Path] = repo
 	}
 
-	// Validate all repo data before saving
-	if config.AppConfig.Debug {
-		fmt.Println("Debug: Validating repository data...")
-	}
+	// Update cache with new data using the manager's method
+	manager.updateCacheData(reposMap)
 
-	for i, repo := range repos {
-		result := repo.ValidateData()
-		if !result.Valid {
-			fmt.Printf("Warning: Data validation issues found in repo %d:\n", i)
-			for _, issue := range result.Issues {
-				fmt.Printf("  - %s\n", issue)
-			}
-		}
-	}
-
-	return SaveCache(cacheFilePath)
+	return manager.Save()
 }
 
 // AsyncRefreshCache performs a non-blocking cache refresh
@@ -220,19 +112,130 @@ func AsyncRefreshCache(dirs []string, author string, cacheFilePath string, exclu
 	}()
 }
 
-// QuickNeedsRefresh performs a fast check if refresh is needed without scanning repositories
+// QuickNeedsRefresh performs a fast check if refresh is needed
 func QuickNeedsRefresh(refreshInterval time.Duration) bool {
 	mutex.RLock()
 	defer mutex.RUnlock()
 
-	if metadata.LastRefresh.IsZero() {
+	if manager == nil || manager.cache == nil {
 		return true
 	}
 
-	// Check if cache file exists and its modification time
-	if time.Since(metadata.LastRefresh) > refreshInterval {
-		return true
+	return time.Since(manager.cache.LastSync) > refreshInterval
+}
+
+// CleanCache removes the cache file and resets the in-memory cache
+func CleanCache(cacheFilePath string) error {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	if manager != nil {
+		manager.cache = newCommitCache()
 	}
 
-	return false
+	// Remove cache file if present
+	if err := os.Remove(cacheFilePath); err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("error removing cache file: %v", err)
+		}
+	}
+
+	// Remove metadata file if present
+	metaFile := cacheFilePath + ".meta"
+	if err := os.Remove(metaFile); err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("error removing metadata file: %v", err)
+		}
+	}
+
+	return nil
+}
+
+// Helper function to get cache file path
+func getCacheFilePath() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if config.AppState.ActiveProfile == "" {
+		return filepath.Join(home, ".streakode.cache")
+	}
+	return filepath.Join(home, fmt.Sprintf(".streakode_%s.cache", config.AppState.ActiveProfile))
+}
+
+// Cache is now a proxy to the manager's cache
+var Cache = &cacheProxy{}
+
+type cacheProxy struct{}
+
+func (cp *cacheProxy) Get(key string) (scan.RepoMetadata, bool) {
+	mutex.RLock()
+	defer mutex.RUnlock()
+
+	if manager == nil || manager.cache == nil {
+		return scan.RepoMetadata{}, false
+	}
+
+	repo, exists := manager.cache.Repositories[key]
+	return repo, exists
+}
+
+func (cp *cacheProxy) GetDisplayStats() *DisplayStats {
+	mutex.RLock()
+	defer mutex.RUnlock()
+
+	if manager == nil || manager.cache == nil {
+		return nil
+	}
+
+	return &manager.cache.DisplayStats
+}
+
+func (cp *cacheProxy) Set(key string, value scan.RepoMetadata) {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	if manager == nil || manager.cache == nil {
+		return
+	}
+
+	manager.cache.Repositories[key] = value
+}
+
+func (cp *cacheProxy) Delete(key string) {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	if manager == nil || manager.cache == nil {
+		return
+	}
+
+	delete(manager.cache.Repositories, key)
+}
+
+func (cp *cacheProxy) Range(f func(key string, value scan.RepoMetadata) bool) {
+	mutex.RLock()
+	defer mutex.RUnlock()
+
+	if manager == nil || manager.cache == nil {
+		return
+	}
+
+	for k, v := range manager.cache.Repositories {
+		if !f(k, v) {
+			break
+		}
+	}
+}
+
+func (cp *cacheProxy) Len() int {
+	mutex.RLock()
+	defer mutex.RUnlock()
+
+	if manager == nil || manager.cache == nil {
+		return 0
+	}
+
+	return len(manager.cache.Repositories)
 }

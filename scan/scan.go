@@ -17,6 +17,7 @@ type CommitHistory struct {
 	Date        time.Time `json:"date"`
 	Hash        string    `json:"hash"`
 	MessageHead string    `json:"message_head"`
+	Author      string    `json:"author"`
 	FileCount   int       `json:"file_count"`
 	Additions   int       `json:"additions"`
 	Deletions   int       `json:"deletions"`
@@ -377,11 +378,9 @@ func fetchDetailedCommitInfo(repoPath string, author string, since time.Time) ([
 	gitCmd := exec.Command("git", "-C", repoPath, "log",
 		"--all",
 		"--author="+author,
-		"--pretty=format:%H|%aI|%s",
+		"--pretty=format:%H|%aI|%an|%s",
 		"--numstat",
 		"--after="+since.Format("2006-01-02"))
-
-	// fmt.Printf("Debug - Running git command: %v\n", gitCmd.String())
 
 	output, err := gitCmd.Output()
 	if err != nil {
@@ -396,7 +395,7 @@ func fetchDetailedCommitInfo(repoPath string, author string, since time.Time) ([
 		if strings.Contains(line, "|") {
 			// This is a commit header line
 			parts := strings.Split(line, "|")
-			if len(parts) == 3 {
+			if len(parts) == 4 {
 				if currentCommit != nil {
 					history = append(history, *currentCommit)
 				}
@@ -405,7 +404,8 @@ func fetchDetailedCommitInfo(repoPath string, author string, since time.Time) ([
 				currentCommit = &CommitHistory{
 					Hash:        parts[0],
 					Date:        commitTime,
-					MessageHead: parts[2],
+					Author:      parts[2],
+					MessageHead: parts[3],
 				}
 			}
 		} else if line != "" && currentCommit != nil {
@@ -926,4 +926,148 @@ func (m *RepoMetadata) ValidateData() ValidationResult {
 	}
 
 	return result
+}
+
+// FetchRepoMetadata - gets metadata for a single repository
+func FetchRepoMetadata(repoPath string) RepoMetadata {
+	if config.AppConfig.Debug {
+		fmt.Printf("\nDebug: Fetching metadata for repo: %s\n", repoPath)
+	}
+
+	meta := RepoMetadata{
+		Path:         repoPath,
+		LastAnalyzed: time.Now(),
+	}
+
+	// Check if directory exists and is accessible
+	if _, err := os.Stat(repoPath); os.IsNotExist(err) {
+		if config.AppConfig.Debug {
+			fmt.Printf("Debug: Directory not found: %s\n", repoPath)
+		}
+		return meta
+	}
+
+	// Get commit dates in a single git command
+	cmd := exec.Command("git", "-C", repoPath, "log", "--all",
+		"--pretty=format:%ci|%H|%an|%ae|%s")
+
+	if config.AppConfig.Debug {
+		fmt.Printf("Debug: Running git command: %v\n", cmd.String())
+	}
+
+	output, err := cmd.Output()
+	if err != nil {
+		if config.AppConfig.Debug {
+			fmt.Printf("Debug: Git command failed: %v\n", err)
+		}
+		return meta
+	}
+
+	if len(output) > 0 {
+		commits := strings.Split(string(output), "\n")
+		meta.CommitCount = len(commits)
+
+		if config.AppConfig.Debug {
+			fmt.Printf("Debug: Found %d commits\n", meta.CommitCount)
+		}
+
+		// Process each commit
+		for _, commit := range commits {
+			parts := strings.Split(commit, "|")
+			if len(parts) != 5 {
+				continue
+			}
+
+			commitDate, err := time.Parse("2006-01-02 15:04:05 -0700", parts[0])
+			if err != nil {
+				continue
+			}
+
+			// Update last commit time
+			if meta.LastCommit.IsZero() || commitDate.After(meta.LastCommit) {
+				meta.LastCommit = commitDate
+			}
+
+			// Create commit history entry
+			history := CommitHistory{
+				Date:        commitDate,
+				Hash:        parts[1],
+				MessageHead: parts[4],
+			}
+
+			// Get commit stats
+			stats := getCommitStats(repoPath, parts[1])
+			history.FileCount = stats.FileCount
+			history.Additions = stats.Additions
+			history.Deletions = stats.Deletions
+
+			meta.CommitHistory = append(meta.CommitHistory, history)
+		}
+
+		// Calculate additional stats
+		meta.WeeklyCommits = countRecentCommits(commits, 7)
+		meta.MonthlyCommits = countRecentCommits(commits, 30)
+		meta.LastWeeksCommits = countLastWeeksCommits(commits)
+
+		if config.AppConfig.Debug {
+			fmt.Printf("Debug: Weekly commits: %d\n", meta.WeeklyCommits)
+			fmt.Printf("Debug: Monthly commits: %d\n", meta.MonthlyCommits)
+			fmt.Printf("Debug: Last week's commits: %d\n", meta.LastWeeksCommits)
+		}
+
+		// Calculate streak info
+		streakInfo := calculateStreakInfo(commits)
+		meta.CurrentStreak = streakInfo.Current
+		meta.LongestStreak = streakInfo.Longest
+		meta.MostActiveDay = findMostActiveDay(commits)
+
+		// Get language statistics
+		if languages, err := fetchLanguageStats(repoPath); err == nil {
+			meta.Languages = languages
+			meta.TotalLines = calculateTotalLines(languages)
+		}
+	}
+
+	return meta
+}
+
+type commitStats struct {
+	FileCount int
+	Additions int
+	Deletions int
+}
+
+func getCommitStats(repoPath, hash string) commitStats {
+	var stats commitStats
+	cmd := exec.Command("git", "-C", repoPath, "show", "--numstat", "--format=", hash)
+	output, err := cmd.Output()
+	if err != nil {
+		return stats
+	}
+
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		parts := strings.Fields(line)
+		if len(parts) != 3 {
+			continue
+		}
+		add, _ := strconv.Atoi(parts[0])
+		del, _ := strconv.Atoi(parts[1])
+		stats.Additions += add
+		stats.Deletions += del
+		stats.FileCount++
+	}
+
+	return stats
+}
+
+func calculateTotalLines(languages map[string]int) int {
+	total := 0
+	for _, lines := range languages {
+		total += lines
+	}
+	return total
 }
