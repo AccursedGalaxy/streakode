@@ -8,29 +8,15 @@ require (
 	github.com/stretchr/testify v1.9.0
 )
 
-require github.com/olekukonko/tablewriter v0.0.5
+require (
+	github.com/jedib0t/go-pretty/v6 v6.6.1
+	golang.org/x/term v0.25.0
+)
 
 require (
-	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
-	github.com/blang/semver v3.5.1+incompatible // indirect
-	github.com/go-openapi/errors v0.22.0 // indirect
-	github.com/go-openapi/strfmt v0.23.0 // indirect
-	github.com/golang/protobuf v1.5.3 // indirect
-	github.com/google/go-github/v30 v30.1.0 // indirect
-	github.com/google/go-querystring v1.0.0 // indirect
-	github.com/google/uuid v1.6.0 // indirect
-	github.com/inconshreveable/go-update v0.0.0-20160112193335-8152e7eb6ccf // indirect
-	github.com/jedib0t/go-pretty/v6 v6.6.1 // indirect
-	github.com/oklog/ulid v1.3.1 // indirect
-	github.com/rhysd/go-github-selfupdate v1.2.3 // indirect
-	github.com/tcnksm/go-gitconfig v0.1.2 // indirect
-	github.com/ulikunitz/xz v0.5.9 // indirect
-	go.mongodb.org/mongo-driver v1.17.1 // indirect
-	golang.org/x/crypto v0.26.0 // indirect
-	golang.org/x/oauth2 v0.18.0 // indirect
-	golang.org/x/term v0.25.0 // indirect
-	google.golang.org/appengine v1.6.8 // indirect
-	google.golang.org/protobuf v1.33.0 // indirect
+	github.com/google/go-cmp v0.6.0 // indirect
+	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
+	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 )
 
 require (

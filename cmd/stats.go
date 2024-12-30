@@ -45,7 +45,9 @@ const (
     daysInWeek = 7
 )
 
-func calculateCommitTrend(current int, previous int) CommitTrend {
+var calculator = &DefaultStatsCalculator{}
+
+func (c *DefaultStatsCalculator) CalculateCommitTrend(current int, previous int) CommitTrend {
     diff := current - previous
     switch {
     case diff > 0:
@@ -130,13 +132,12 @@ func DisplayStats() {
 	fmt.Println(output)
 }
 
-func calculateTableWith() int {
-	width, _, err := term.GetSize(0)
-	if err != nil {
-		width = defaultTerminalWidth
-	}
-	tableWidth := min(width-2,maxTableWidth)
-    return tableWidth
+func (c *DefaultStatsCalculator) CalculateTableWidth() int {
+    width, _, err := term.GetSize(0)
+    if err != nil {
+        width = defaultTerminalWidth
+    }
+    return min(width-2, maxTableWidth)
 }
 
 
@@ -179,7 +180,7 @@ func buildProjectsSection() string {
 	}
 
     // Configure table column widths
-    tableWidth := calculateTableWith()
+    tableWidth := calculator.CalculateTableWidth()
 	t.SetColumnConfigs([]table.ColumnConfig{
 		{Number: 1, WidthMax: int(float64(tableWidth) * 0.35)}, // Repository name
 		{Number: 2, WidthMax: int(float64(tableWidth) * 0.15)}, // Weekly commits
@@ -352,15 +353,13 @@ func getTableStyle() table.Style {
     }
 }
 
-func processLanguageStats(cache map[string]scan.RepoMetadata) map[string]int {
+func (c *DefaultStatsCalculator) ProcessLanguageStats(cache map[string]scan.RepoMetadata) map[string]int {
     languageStats := make(map[string]int)
-
     for _, repo := range cache {
         for lang, lines := range repo.Languages {
             languageStats[lang] += lines
         }
     }
-
     return languageStats
 }
 
@@ -399,7 +398,7 @@ func buildInsightsSection() string {
 		peakCommits := 0
 
         // Aggregate language stats
-        languageStats := processLanguageStats(cache.Cache)
+        languageStats := calculator.ProcessLanguageStats(cache.Cache)
 
 
 		for _, repo := range cache.Cache {
@@ -430,7 +429,7 @@ func buildInsightsSection() string {
 		}
 
         // Get Commit Trend
-        commitTrend := calculateCommitTrend(totalWeeklyCommits, lastWeeksCommits)
+        commitTrend := calculator.CalculateCommitTrend(totalWeeklyCommits, lastWeeksCommits)
 
 		if insights.ShowWeeklySummary {
 			summary := fmt.Sprintf("%d commits (%s %s), +%d/-%d lines",
@@ -486,4 +485,8 @@ func buildInsightsSection() string {
 	}
 
 	return ""
+}
+
+func (rc *DefaultRepoCache) GetRepos() map[string]scan.RepoMetadata {
+    return rc.cache
 }
