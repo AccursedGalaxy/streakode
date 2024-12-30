@@ -15,15 +15,6 @@ import (
 	"golang.org/x/term"
 )
 
-/*
-TODO::
-- [X] Pre-Allocate Memory for Slices
-
-Testing Stuff:
-- [ ] Create unit tests for calculation logic
-- [ ] Consider using interfaces for better testing
-*/
-
 type repoInfo struct {
     name       string
     metadata   scan.RepoMetadata
