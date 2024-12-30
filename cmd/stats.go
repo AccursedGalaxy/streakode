@@ -388,128 +388,168 @@ func (c *DefaultStatsCalculator) ProcessLanguageStats(cache map[string]scan.Repo
     return languageStats
 }
 
-// TODO: Function too long, refactor and split into smaller functions for better readability and maintainability
+// calculateGlobalStats calculates overall statistics across all repositories
+func calculateGlobalStats(repos map[string]scan.RepoMetadata) (int, int, int, int, int, map[int]int) {
+	totalWeeklyCommits := 0
+	lastWeeksCommits := 0
+	totalMonthlyCommits := 0
+	totalAdditions := 0
+	totalDeletions := 0
+	hourStats := make(map[int]int)
+
+	weekStart := time.Now().AddDate(0, 0, -daysInWeek)
+	for _, repo := range repos {
+		if repo.Dormant {
+			continue
+		}
+
+		totalWeeklyCommits += repo.WeeklyCommits
+		lastWeeksCommits += repo.LastWeeksCommits
+		totalMonthlyCommits += repo.MonthlyCommits
+
+		for _, commit := range repo.CommitHistory {
+			if commit.Date.After(weekStart) {
+				totalAdditions += commit.Additions
+				totalDeletions += commit.Deletions
+				hourStats[commit.Date.Hour()]++
+			}
+		}
+	}
+
+	return totalWeeklyCommits, lastWeeksCommits, totalMonthlyCommits, totalAdditions, totalDeletions, hourStats
+}
+
+// findPeakCodingHour determines the hour with the most commits
+func findPeakCodingHour(hourStats map[int]int) (int, int) {
+	peakHour := 0
+	peakCommits := 0
+
+	for hour, commits := range hourStats {
+		if commits > peakCommits {
+			peakHour = hour
+			peakCommits = commits
+		}
+	}
+
+	return peakHour, peakCommits
+}
+
+// formatWeeklySummary creates a formatted weekly summary string
+func formatWeeklySummary(totalWeeklyCommits int, commitTrend CommitTrend, totalAdditions, totalDeletions int) string {
+	return fmt.Sprintf("%d commits (%s %s), +%d/-%d lines",
+		totalWeeklyCommits,
+		commitTrend.indicator,
+		commitTrend.text,
+		totalAdditions,
+		totalDeletions)
+}
+
+type insightStats struct {
+	weeklyCommits int
+	additions     int
+	deletions     int
+	peakHour      int
+	peakCommits   int
+	commitTrend   CommitTrend
+	languageStats map[string]int
+}
+
+// appendInsightRows adds insight rows to the table based on configuration
+func appendInsightRows(t table.Writer, insights struct {
+	TopLanguagesCount int  `mapstructure:"top_languages_count"`
+	ShowDailyAverage  bool `mapstructure:"show_daily_average"`
+	ShowTopLanguages  bool `mapstructure:"show_top_languages"`
+	ShowPeakCoding    bool `mapstructure:"show_peak_coding"`
+	ShowWeeklySummary bool `mapstructure:"show_weekly_summary"`
+	ShowWeeklyGoal    bool `mapstructure:"show_weekly_goal"`
+	ShowMostActive    bool `mapstructure:"show_most_active"`
+}, stats insightStats) {
+	if insights.ShowWeeklySummary {
+		summary := formatWeeklySummary(stats.weeklyCommits, stats.commitTrend, stats.additions, stats.deletions)
+		t.AppendRow(table.Row{"📈", "Weekly Summary:", summary})
+	}
+
+	if insights.ShowDailyAverage {
+		t.AppendRow(table.Row{"📊", "Daily Average:",
+			fmt.Sprintf("%.1f commits", float64(stats.weeklyCommits)/daysInWeek)})
+	}
+
+	if insights.ShowTopLanguages && len(stats.languageStats) > 0 {
+		langs := formatLanguages(stats.languageStats, insights.TopLanguagesCount)
+		t.AppendRow(table.Row{"💻", "Top Languages:", langs})
+	}
+
+	if insights.ShowPeakCoding {
+		t.AppendRow(table.Row{"⏰", "Peak Coding:",
+			fmt.Sprintf("%02d:00-%02d:00 (%d commits)",
+				stats.peakHour, (stats.peakHour+1)%hoursInDay, stats.peakCommits)})
+	}
+
+	if insights.ShowWeeklyGoal && config.AppConfig.GoalSettings.WeeklyCommitGoal > 0 {
+		progress := float64(stats.weeklyCommits) / float64(config.AppConfig.GoalSettings.WeeklyCommitGoal) * 100
+		t.AppendRow(table.Row{"🎯", "Weekly Goal:",
+			fmt.Sprintf("%d%% (%d/%d commits)",
+				int(progress), stats.weeklyCommits, config.AppConfig.GoalSettings.WeeklyCommitGoal)})
+	}
+}
+
+// buildSimpleInsights creates a simple insight string for non-detailed view
+func buildSimpleInsights(repos map[string]scan.RepoMetadata) string {
+	if !config.AppConfig.DisplayStats.InsightSettings.ShowMostActive {
+		return ""
+	}
+
+	var mostProductiveRepo string
+	maxActivity := 0
+	for path, repo := range repos {
+		if repo.WeeklyCommits > maxActivity {
+			maxActivity = repo.WeeklyCommits
+			mostProductiveRepo = path[strings.LastIndex(path, "/")+1:]
+		}
+	}
+
+	if mostProductiveRepo != "" {
+		return fmt.Sprintf("  🌟 Most active: %s", mostProductiveRepo)
+	}
+	return ""
+}
+
+// buildInsightsSection - Displays insights about coding activity
 func buildInsightsSection() string {
 	if !config.AppConfig.DisplayStats.ShowInsights {
 		return ""
 	}
 
 	// Get the same terminal width as used elsewhere
-	width, _, err := term.GetSize(0)
-	if err != nil {
-		width = defaultTerminalWidth
-	}
-	tableWidth := min(width-2, maxTableWidth)
-
+	tableWidth := calculator.CalculateTableWidth()
 	insights := config.AppConfig.DisplayStats.InsightSettings
 
 	if config.AppConfig.DetailedStats {
 		t := table.NewWriter()
-        t.SetStyle(getTableStyle())
-
-		// Set max width for the entire table
+		t.SetStyle(getTableStyle())
 		t.SetAllowedRowLength(tableWidth-2)
 
-		// Calculate global stats
-		totalWeeklyCommits := 0
-		lastWeeksCommits := 0
-		totalMonthlyCommits := 0
-		totalAdditions := 0
-		totalDeletions := 0
-		hourStats := make(map[int]int)
+		// Calculate all stats
+		weeklyCommits, lastWeeksCommits, _, additions, deletions, hourStats := calculateGlobalStats(cache.Cache)
+		peakHour, peakCommits := findPeakCodingHour(hourStats)
+		commitTrend := calculator.CalculateCommitTrend(weeklyCommits, lastWeeksCommits)
+		languageStats := calculator.ProcessLanguageStats(cache.Cache)
 
-		// Find peak coding hour
-		peakHour := 0
-		peakCommits := 0
-
-        // Aggregate language stats
-        languageStats := calculator.ProcessLanguageStats(cache.Cache)
-
-
-		for _, repo := range cache.Cache {
-			if repo.Dormant {
-				continue
-			}
-
-			totalWeeklyCommits += repo.WeeklyCommits
-			lastWeeksCommits += repo.LastWeeksCommits
-			totalMonthlyCommits += repo.MonthlyCommits
-
-            // Calculate code changes and peak hours
-			weekStart := time.Now().AddDate(0, 0, -daysInWeek)
-			for _, commit := range repo.CommitHistory {
-				if commit.Date.After(weekStart) {
-					totalAdditions += commit.Additions
-					totalDeletions += commit.Deletions
-					hour := commit.Date.Hour()
-					hourStats[hour]++
-
-					// Update peak hour
-					if hourStats[hour] > peakCommits {
-						peakHour = hour
-						peakCommits = hourStats[hour]
-					}
-				}
-			}
-		}
-
-        // Get Commit Trend
-        commitTrend := calculator.CalculateCommitTrend(totalWeeklyCommits, lastWeeksCommits)
-
-		if insights.ShowWeeklySummary {
-			summary := fmt.Sprintf("%d commits (%s %s), +%d/-%d lines",
-			totalWeeklyCommits,
-            commitTrend.indicator,
-            commitTrend.text,
-			totalAdditions,
-			totalDeletions)
-
-			t.AppendRow(table.Row{"📈", "Weekly Summary:", summary})
-		}
-
-        // NOTE: Possibly Show A Comparison To Last weeks Daily Average
-		if insights.ShowDailyAverage {
-			t.AppendRow(table.Row{"📊", "Daily Average:",
-				fmt.Sprintf("%.1f commits", float64(totalWeeklyCommits)/daysInWeek)})
-		}
-
-		if insights.ShowTopLanguages && len(languageStats) > 0 {
-			langs := formatLanguages(languageStats, insights.TopLanguagesCount)
-			t.AppendRow(table.Row{"💻", "Top Languages:", langs})
-		}
-
-		if insights.ShowPeakCoding {
-			t.AppendRow(table.Row{"⏰", "Peak Coding:",
-				fmt.Sprintf("%02d:00-%02d:00 (%d commits)",
-				peakHour, (peakHour+1)%hoursInDay, peakCommits)})
-		}
-
-		if insights.ShowWeeklyGoal && config.AppConfig.GoalSettings.WeeklyCommitGoal > 0 {
-			progress := float64(totalWeeklyCommits) / float64(config.AppConfig.GoalSettings.WeeklyCommitGoal) * 100
-			t.AppendRow(table.Row{"🎯", "Weekly Goal:",
-				fmt.Sprintf("%d%% (%d/%d commits)",
-				int(progress), totalWeeklyCommits, config.AppConfig.GoalSettings.WeeklyCommitGoal)})
-		}
+		// Append rows based on configuration
+		appendInsightRows(t, insights, insightStats{
+			weeklyCommits: weeklyCommits,
+			additions:     additions,
+			deletions:     deletions,
+			peakHour:     peakHour,
+			peakCommits:  peakCommits,
+			commitTrend:   commitTrend,
+			languageStats: languageStats,
+		})
 
 		return t.Render()
-	} else {
-		// Simple insights for non-detailed view
-		if insights.ShowMostActive {
-			var mostProductiveRepo string
-			maxActivity := 0
-			for path, repo := range cache.Cache {
-				if repo.WeeklyCommits > maxActivity {
-					maxActivity = repo.WeeklyCommits
-					mostProductiveRepo = path[strings.LastIndex(path, "/")+1:]
-				}
-			}
-			if mostProductiveRepo != "" {
-				return fmt.Sprintf("  🌟 Most active: %s", mostProductiveRepo)
-			}
-		}
 	}
 
-	return ""
+	return buildSimpleInsights(cache.Cache)
 }
 
 func (rc *DefaultRepoCache) GetRepos() map[string]scan.RepoMetadata {
