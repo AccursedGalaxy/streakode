@@ -97,8 +97,8 @@ func main() {
 	)
 
 	rootCmd := &cobra.Command{
-		Use:   "streakode",
-		Short: "A Git activity tracker for monitoring coding streaks",
+		Use:     "streakode",
+		Short:   "A Git activity tracker for monitoring coding streaks",
 		Version: Version,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			// Load the state first to get the active profile
@@ -131,10 +131,23 @@ func main() {
 	rootCmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "Enable debug mode")
 
 	statsCmd := &cobra.Command{
-		Use: "stats",
-		Short: "Display stats for all active repositories",
+		Use:   "stats [repository]",
+		Short: "Display stats for all active repositories or a specific repository",
+		Long: `Display Git activity statistics for your repositories.
+
+Without arguments, shows stats for all active repositories.
+With a repository name argument, shows detailed stats for just that repository.
+
+Example:
+  streakode stats             # Show stats for all repositories
+  streakode stats myproject   # Show stats for only the myproject repository`,
+		Args: cobra.MaximumNArgs(1),
 		Run: func(cobraCmd *cobra.Command, args []string) {
-			cmd.DisplayStats()
+			var targetRepo string
+			if len(args) > 0 {
+				targetRepo = args[0]
+			}
+			cmd.DisplayStats(targetRepo)
 		},
 	}
 
@@ -230,7 +243,7 @@ func main() {
 				os.Exit(1)
 			}
 
-      		// Validate the config
+			// Validate the config
 			if err := newConfig.ValidateConfig(); err != nil {
 				fmt.Printf("Error: Invalid configuration for profile '%s': %v\n", newProfile, err)
 				os.Exit(1)
@@ -270,7 +283,7 @@ func main() {
 		},
 	}
 
-    authorCmd := &cobra.Command{
+	authorCmd := &cobra.Command{
 		Use:   "author",
 		Short: "Show configured Git author information",
 		Run: func(cmd *cobra.Command, args []string) {

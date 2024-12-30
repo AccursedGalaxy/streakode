@@ -5,9 +5,6 @@ This document outlines new and additional features that are planned or already i
 ---
 
 ## IDEAS
-- add optional "repository" argument to stats command
-   -> i.e.: streakode stats streakode -> to get more detailed stats about just the streakode repository
-
 - add optional "author" argument to the author command
    -> i.e.: streakode author AccursedGalaxy -> to get detailed stats about this author (currently just shows author set from the config to verify it's setup correctly, but can easily expand this to show detailed stats abou the author as well)
 

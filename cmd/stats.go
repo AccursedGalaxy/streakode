@@ -16,44 +16,44 @@ import (
 )
 
 type repoInfo struct {
-    name       string
-    metadata   scan.RepoMetadata
-    lastCommit time.Time
+	name       string
+	metadata   scan.RepoMetadata
+	lastCommit time.Time
 }
 
 type CommitTrend struct {
-    indicator   string
-    text        string
+	indicator string
+	text      string
 }
 
 type LanguageStats map[string]int
 type HourStats map[int]int
 
 const (
-    defaultTerminalWidth = 80
-    maxTableWidth = 120
-    hoursInDay = 24
-    daysInWeek = 7
+	defaultTerminalWidth = 80
+	maxTableWidth        = 120
+	hoursInDay           = 24
+	daysInWeek           = 7
 )
 
 var calculator = &DefaultStatsCalculator{}
 
 func (c *DefaultStatsCalculator) CalculateCommitTrend(current int, previous int) CommitTrend {
-    diff := current - previous
-    switch {
-    case diff > 0:
-        return CommitTrend{"↗️", fmt.Sprintf("up %d", diff)}
-    case diff < 0:
-        return CommitTrend{"↘️", fmt.Sprintf("down %d", -diff)}
-    default:
-        return CommitTrend{"-", ""}
-    }
+	diff := current - previous
+	switch {
+	case diff > 0:
+		return CommitTrend{"↗️", fmt.Sprintf("up %d", diff)}
+	case diff < 0:
+		return CommitTrend{"↘️", fmt.Sprintf("down %d", -diff)}
+	default:
+		return CommitTrend{"-", ""}
+	}
 }
 
-// DisplayStats - Displays stats for all active repositories in a more compact format
-func DisplayStats() {
+// DisplayStats - Displays stats for all active repositories or a specific repository
+func DisplayStats(targetRepo string) {
 	// Get table width from the rendered table first
-	projectsSection := buildProjectsSection()
+	projectsSection := buildProjectsSection(targetRepo)
 	tableLines := strings.Split(projectsSection, "\n")
 	if len(tableLines) == 0 {
 		return
@@ -76,11 +76,13 @@ func DisplayStats() {
 	// Header section
 	if config.AppConfig.DisplayStats.ShowWelcomeMessage {
 		headerText := fmt.Sprintf("🚀 %s's Coding Activity", config.AppConfig.Author)
+		if targetRepo != "" {
+			headerText = fmt.Sprintf("🚀 %s's Activity in %s", config.AppConfig.Author, targetRepo)
+		}
 		padding := (tableWidth - len([]rune(headerText))) / 2
 		centeredHeader := fmt.Sprintf("%*s%s%*s", padding, "", headerText, padding, "")
 		sections = append(sections, headerStyle.Render(centeredHeader))
 	}
-
 
 	// Active projects section (table)
 	if config.AppConfig.DisplayStats.ShowActiveProjects && projectsSection != "" {
@@ -89,7 +91,7 @@ func DisplayStats() {
 
 	// Insights section
 	if config.AppConfig.DisplayStats.ShowInsights {
-		insights := buildInsightsSection()
+		insights := buildInsightsSection(targetRepo)
 		if insights != "" {
 			sections = append(sections, insights)
 		}
@@ -124,11 +126,11 @@ func DisplayStats() {
 }
 
 func (c *DefaultStatsCalculator) CalculateTableWidth() int {
-    width, _, err := term.GetSize(0)
-    if err != nil {
-        width = defaultTerminalWidth
-    }
-    return min(width-2, maxTableWidth)
+	width, _, err := term.GetSize(0)
+	if err != nil {
+		width = defaultTerminalWidth
+	}
+	return min(width-2, maxTableWidth)
 }
 
 // prepareRepoData converts the cache map into a sorted slice of repository information
@@ -154,7 +156,7 @@ func prepareRepoData() []repoInfo {
 // initializeTable creates and configures a new table writer with proper settings
 func initializeTable(tableWidth int) table.Writer {
 	t := table.NewWriter()
-	
+
 	// Configure table column widths
 	t.SetColumnConfigs([]table.ColumnConfig{
 		{Number: 1, WidthMax: int(float64(tableWidth) * 0.35)}, // Repository name
@@ -198,13 +200,13 @@ func formatActivityIndicator(weeklyCommits int) string {
 func formatStreakString(currentStreak, longestStreak int) string {
 	indicators := config.AppConfig.DisplayStats.ActivityIndicators
 	streakStr := fmt.Sprintf("%dd", currentStreak)
-	
+
 	if currentStreak == longestStreak && currentStreak > 0 {
 		streakStr += indicators.StreakRecord
 	} else if currentStreak > 0 {
 		streakStr += indicators.ActiveStreak
 	}
-	
+
 	return streakStr
 }
 
@@ -212,14 +214,14 @@ func formatStreakString(currentStreak, longestStreak int) string {
 func calculateWeeklyChanges(commitHistory []scan.CommitHistory) (int, int) {
 	var weeklyAdditions, weeklyDeletions int
 	weekStart := time.Now().AddDate(0, 0, -daysInWeek)
-	
+
 	for _, commit := range commitHistory {
 		if commit.Date.After(weekStart) {
 			weeklyAdditions += commit.Additions
 			weeklyDeletions += commit.Deletions
 		}
 	}
-	
+
 	return weeklyAdditions, weeklyDeletions
 }
 
@@ -231,18 +233,34 @@ func formatLastActivity(lastCommit time.Time) string {
 	return "today"
 }
 
-// buildProjectsSection - Displays stats for all active repositories in a more compact format
-func buildProjectsSection() string {
+// buildProjectsSection - Displays stats for all active repositories or a specific repository
+func buildProjectsSection(targetRepo string) string {
 	if !config.AppConfig.DisplayStats.ShowActiveProjects {
 		return ""
 	}
 
 	// Create buffer for table
 	buf := new(bytes.Buffer)
-	
+
 	// Get sorted repo data
 	repos := prepareRepoData()
-	
+
+	// Filter for target repository if specified
+	if targetRepo != "" {
+		filteredRepos := make([]repoInfo, 0)
+		for _, repo := range repos {
+			if repo.name == targetRepo {
+				filteredRepos = append(filteredRepos, repo)
+				break
+			}
+		}
+		if len(filteredRepos) == 0 {
+			fmt.Printf("Repository '%s' not found in cache. Run 'streakode cache reload' to update cache.\n", targetRepo)
+			return ""
+		}
+		repos = filteredRepos
+	}
+
 	// Initialize table with proper width
 	tableWidth := calculator.CalculateTableWidth()
 	t := initializeTable(tableWidth)
@@ -290,21 +308,21 @@ func buildProjectsSection() string {
 func formatLanguages(stats map[string]int, topCount int) string {
 	// Language icons mapping with more descriptive emojis
 	languageIcons := map[string]string{
-		"go":		config.AppConfig.LanguageSettings.LanguageDisplay.GoDisplay,
-		"py":		config.AppConfig.LanguageSettings.LanguageDisplay.PythonDisplay,
-		"lua":		config.AppConfig.LanguageSettings.LanguageDisplay.LuaDisplay,
-		"js":		config.AppConfig.LanguageSettings.LanguageDisplay.JavaDisplay,
-		"ts":		config.AppConfig.LanguageSettings.LanguageDisplay.TypeScriptDisplay,
-		"rust":		config.AppConfig.LanguageSettings.LanguageDisplay.RustDisplay,
-		"cpp":		config.AppConfig.LanguageSettings.LanguageDisplay.CppDisplay,
-		"c":		config.AppConfig.LanguageSettings.LanguageDisplay.CDisplay,
-		"java":		config.AppConfig.LanguageSettings.LanguageDisplay.JavaDisplay,
-		"ruby":		config.AppConfig.LanguageSettings.LanguageDisplay.RubyDisplay,
-		"php":		config.AppConfig.LanguageSettings.LanguageDisplay.PHPDisplay,
-		"html":		config.AppConfig.LanguageSettings.LanguageDisplay.HTMLDisplay,
-		"css":		config.AppConfig.LanguageSettings.LanguageDisplay.CSSDisplay,
-		"shell":	config.AppConfig.LanguageSettings.LanguageDisplay.ShellDisplay,
-		"default":	config.AppConfig.LanguageSettings.LanguageDisplay.DefaultDisplay,
+		"go":      config.AppConfig.LanguageSettings.LanguageDisplay.GoDisplay,
+		"py":      config.AppConfig.LanguageSettings.LanguageDisplay.PythonDisplay,
+		"lua":     config.AppConfig.LanguageSettings.LanguageDisplay.LuaDisplay,
+		"js":      config.AppConfig.LanguageSettings.LanguageDisplay.JavaDisplay,
+		"ts":      config.AppConfig.LanguageSettings.LanguageDisplay.TypeScriptDisplay,
+		"rust":    config.AppConfig.LanguageSettings.LanguageDisplay.RustDisplay,
+		"cpp":     config.AppConfig.LanguageSettings.LanguageDisplay.CppDisplay,
+		"c":       config.AppConfig.LanguageSettings.LanguageDisplay.CDisplay,
+		"java":    config.AppConfig.LanguageSettings.LanguageDisplay.JavaDisplay,
+		"ruby":    config.AppConfig.LanguageSettings.LanguageDisplay.RubyDisplay,
+		"php":     config.AppConfig.LanguageSettings.LanguageDisplay.PHPDisplay,
+		"html":    config.AppConfig.LanguageSettings.LanguageDisplay.HTMLDisplay,
+		"css":     config.AppConfig.LanguageSettings.LanguageDisplay.CSSDisplay,
+		"shell":   config.AppConfig.LanguageSettings.LanguageDisplay.ShellDisplay,
+		"default": config.AppConfig.LanguageSettings.LanguageDisplay.DefaultDisplay,
 	}
 
 	// Convert map to slice for sorting
@@ -324,16 +342,16 @@ func formatLanguages(stats map[string]int, topCount int) string {
 		return langs[i].lines > langs[j].lines
 	})
 
-    // Calculate size needed for formatted slice
-    size := 0
-    for i := 0; i < min(len(langs), topCount); i++ {
-        if langs[i].lines > 0 {
-            size++
-        }
-    }
+	// Calculate size needed for formatted slice
+	size := 0
+	for i := 0; i < min(len(langs), topCount); i++ {
+		if langs[i].lines > 0 {
+			size++
+		}
+	}
 
 	// Format languages with icons and better number formatting
-    formatted := make([]string, 0, size)
+	formatted := make([]string, 0, size)
 	for i := 0; i < min(len(langs), topCount); i++ {
 		if langs[i].lines > 0 {
 			// Retrieve icon or default if not found
@@ -363,29 +381,29 @@ func formatLanguages(stats map[string]int, topCount int) string {
 }
 
 func getTableStyle() table.Style {
-    return table.Style{
-        Options: table.Options{
-            DrawBorder:     config.AppConfig.DisplayStats.TableStyle.Options.DrawBorder,
-            SeparateColumns: config.AppConfig.DisplayStats.TableStyle.Options.SeparateColumns,
-            SeparateHeader: config.AppConfig.DisplayStats.TableStyle.Options.SeparateHeader,
-            SeparateRows:   config.AppConfig.DisplayStats.TableStyle.Options.SeparateRows,
-        },
-        Box: table.BoxStyle{
-            PaddingLeft:  "",
-            PaddingRight: " ",
-            MiddleVertical: "",
-        },
-    }
+	return table.Style{
+		Options: table.Options{
+			DrawBorder:      config.AppConfig.DisplayStats.TableStyle.Options.DrawBorder,
+			SeparateColumns: config.AppConfig.DisplayStats.TableStyle.Options.SeparateColumns,
+			SeparateHeader:  config.AppConfig.DisplayStats.TableStyle.Options.SeparateHeader,
+			SeparateRows:    config.AppConfig.DisplayStats.TableStyle.Options.SeparateRows,
+		},
+		Box: table.BoxStyle{
+			PaddingLeft:    "",
+			PaddingRight:   " ",
+			MiddleVertical: "",
+		},
+	}
 }
 
 func (c *DefaultStatsCalculator) ProcessLanguageStats(cache map[string]scan.RepoMetadata) map[string]int {
-    languageStats := make(map[string]int)
-    for _, repo := range cache {
-        for lang, lines := range repo.Languages {
-            languageStats[lang] += lines
-        }
-    }
-    return languageStats
+	languageStats := make(map[string]int)
+	for _, repo := range cache {
+		for lang, lines := range repo.Languages {
+			languageStats[lang] += lines
+		}
+	}
+	return languageStats
 }
 
 // calculateGlobalStats calculates overall statistics across all repositories
@@ -515,7 +533,7 @@ func buildSimpleInsights(repos map[string]scan.RepoMetadata) string {
 }
 
 // buildInsightsSection - Displays insights about coding activity
-func buildInsightsSection() string {
+func buildInsightsSection(targetRepo string) string {
 	if !config.AppConfig.DisplayStats.ShowInsights {
 		return ""
 	}
@@ -524,24 +542,41 @@ func buildInsightsSection() string {
 	tableWidth := calculator.CalculateTableWidth()
 	insights := config.AppConfig.DisplayStats.InsightSettings
 
+	// Filter cache for target repository if specified
+	var repoCache map[string]scan.RepoMetadata
+	repoCache = cache.Cache
+	if targetRepo != "" {
+		filteredCache := make(map[string]scan.RepoMetadata)
+		for path, repo := range cache.Cache {
+			if strings.HasSuffix(path, "/"+targetRepo) {
+				filteredCache[path] = repo
+				break
+			}
+		}
+		if len(filteredCache) == 0 {
+			return ""
+		}
+		repoCache = filteredCache
+	}
+
 	if config.AppConfig.DetailedStats {
 		t := table.NewWriter()
 		t.SetStyle(getTableStyle())
-		t.SetAllowedRowLength(tableWidth-2)
+		t.SetAllowedRowLength(tableWidth - 2)
 
 		// Calculate all stats
-		weeklyCommits, lastWeeksCommits, _, additions, deletions, hourStats := calculateGlobalStats(cache.Cache)
+		weeklyCommits, lastWeeksCommits, _, additions, deletions, hourStats := calculateGlobalStats(repoCache)
 		peakHour, peakCommits := findPeakCodingHour(hourStats)
 		commitTrend := calculator.CalculateCommitTrend(weeklyCommits, lastWeeksCommits)
-		languageStats := calculator.ProcessLanguageStats(cache.Cache)
+		languageStats := calculator.ProcessLanguageStats(repoCache)
 
 		// Append rows based on configuration
 		appendInsightRows(t, insights, insightStats{
 			weeklyCommits: weeklyCommits,
 			additions:     additions,
 			deletions:     deletions,
-			peakHour:     peakHour,
-			peakCommits:  peakCommits,
+			peakHour:      peakHour,
+			peakCommits:   peakCommits,
 			commitTrend:   commitTrend,
 			languageStats: languageStats,
 		})
@@ -549,9 +584,9 @@ func buildInsightsSection() string {
 		return t.Render()
 	}
 
-	return buildSimpleInsights(cache.Cache)
+	return buildSimpleInsights(repoCache)
 }
 
 func (rc *DefaultRepoCache) GetRepos() map[string]scan.RepoMetadata {
-    return rc.cache
+	return rc.cache
 }

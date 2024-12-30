@@ -158,8 +158,11 @@ streakode version
 # Check your Git author configuration
 streakode author
 
-# Show statistics
+# Show statistics for all repositories
 streakode stats
+
+# Show statistics for a specific repository
+streakode stats myproject
 
 # Show statistics with debug output
 streakode stats --debug
