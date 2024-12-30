@@ -12,16 +12,18 @@ import (
 
 // SearchResult represents a single commit in the search results
 type SearchResult struct {
-	Hash        string    `json:"hash"`
-	Date        time.Time `json:"date"`
-	Author      string    `json:"author"`
-	Message     string    `json:"message"`
-	Repository  string    `json:"repository"`
-	FileCount   int       `json:"file_count"`
-	Additions   int       `json:"additions"`
-	Deletions   int       `json:"deletions"`
-	Branch      string    `json:"branch"` // Added to show branch information
-	DisplayText string    `json:"-"`      // Used for fzf display
+	Hash         string    `json:"hash"`
+	Date         time.Time `json:"date"`
+	Author       string    `json:"author"`
+	Message      string    `json:"message"`
+	Repository   string    `json:"repository"`
+	FileCount    int       `json:"file_count"`
+	Additions    int       `json:"additions"`
+	Deletions    int       `json:"deletions"`
+	Branch       string    `json:"branch"`  // Added to show branch information
+	DisplayText  string    `json:"-"`       // Used for fzf display
+	FilesChanged []string  `json:"files"`   // List of changed files
+	Preview      string    `json:"preview"` // Content preview for files
 }
 
 // SearchOptions defines the configuration for interactive search
@@ -134,9 +136,42 @@ func buildPreviewCmd() string {
 	return `
 # Extract JSON data from the hidden part of the line
 JSON=$(echo {} | sed 's/.*\x1b\[0m\x1b\[30m\(.*\)\x1b\[0m/\1/')
-HASH=$(echo "$JSON" | grep -o '"hash":"[^"]*"' | cut -d'"' -f4)
-REPO=$(echo "$JSON" | grep -o '"repository":"[^"]*"' | cut -d'"' -f4)
 
+# Get file path and content
+FILE_PATH=$(echo "$JSON" | grep -o '"message":"[^"]*"' | cut -d'"' -f4)
+REPO=$(echo "$JSON" | grep -o '"repository":"[^"]*"' | cut -d'"' -f4)
+HASH=$(echo "$JSON" | grep -o '"hash":"[^"]*"' | cut -d'"' -f4)
+
+if [ -n "$FILE_PATH" ] && [ -n "$REPO" ] && [ -n "$HASH" ]; then
+    # Try to find the repository
+    REPO_PATH=""
+    CURRENT_DIR="$PWD"
+    while [ "$CURRENT_DIR" != "/" ]; do
+        if [ -d "$CURRENT_DIR/$REPO" ]; then
+            REPO_PATH="$CURRENT_DIR/$REPO"
+            break
+        elif [ -d "$CURRENT_DIR/$REPO/.git" ]; then
+            REPO_PATH="$CURRENT_DIR/$REPO"
+            break
+        fi
+        CURRENT_DIR=$(dirname "$CURRENT_DIR")
+    done
+
+    if [ -n "$REPO_PATH" ]; then
+        echo -e "\033[1;36m# File: $FILE_PATH\033[0m"
+        echo -e "\033[1;36m# Repository: $REPO\033[0m"
+        echo -e "\033[1;36m# Commit: $HASH\033[0m"
+        echo "----------------------------------------"
+        
+        # Get file content directly from git
+        git -C "$REPO_PATH" show "$HASH:$FILE_PATH" 2>/dev/null | bat --style=numbers --color=always --language=go 2>/dev/null || \
+        git -C "$REPO_PATH" show "$HASH:$FILE_PATH" 2>/dev/null || \
+        echo "File content not available"
+        exit 0
+    fi
+fi
+
+# Fall back to commit preview if not in file mode
 if [ -n "$HASH" ] && [ -n "$REPO" ]; then
 	# Try to find the repository in common parent directories
 	REPO_PATH=""

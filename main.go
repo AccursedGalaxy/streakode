@@ -315,7 +315,7 @@ Example:
 
 	// Add history command
 	historyCmd := &cobra.Command{
-		Use:   "history [command]",
+		Use:   "history",
 		Short: "Interactive Git history search and exploration",
 		Long: `Interactive Git history search and exploration with powerful filtering and viewing options.
 
@@ -327,7 +327,6 @@ Key Features:
 - Instant interactive fuzzy search through commit history
 - Progressive loading of results for immediate responsiveness
 - Rich commit preview with diff and stats
-- Filter by repository, author, or time range
 - Multiple view formats and sorting options
 - Smart caching for faster subsequent searches
 - Keyboard shortcuts for efficient navigation
@@ -342,33 +341,16 @@ Navigation:
 		Example: `  # Interactive search through all commits (last 7 days)
   streakode history
 
-  # Search commits from a specific author
-  streakode history -a "Your Name"
-
-  # Search in a specific repository
-  streakode history repo myrepo
-
-  # View recent activity (last 24 hours)
-  streakode history recent
-
-  # Search through file changes
-  streakode history files
-
-  # View commit activity stats
-  streakode history stats
-
   # Show detailed history for the last 30 days
   streakode history --days 30 --format detailed`,
 		Run: func(cobraCmd *cobra.Command, args []string) {
 			var opts cmd.HistoryOptions
 
 			// Get flags
-			author, _ := cobraCmd.Flags().GetString("author")
 			days, _ := cobraCmd.Flags().GetInt("days")
 			format, _ := cobraCmd.Flags().GetString("format")
 
-			// Set options
-			opts.Author = author
+			// Set options for base history command - no filtering
 			opts.Days = days
 			opts.Format = format
 			if days == 0 {
@@ -380,29 +362,52 @@ Navigation:
 	}
 
 	// Add subcommands
+	historyAuthorCmd := &cobra.Command{
+		Use:   "author [author-name]",
+		Short: "Search history for a specific author",
+		Long: `Search through Git history for commits by a specific author.
+
+The search interface will show commits from the specified author across all repositories,
+with results loading progressively as they become available.`,
+		Args: cobra.ExactArgs(1),
+		Run: func(cobraCmd *cobra.Command, args []string) {
+			var opts cmd.HistoryOptions
+			opts.Author = args[0]
+
+			// Get flags
+			days, _ := cobraCmd.Flags().GetInt("days")
+			format, _ := cobraCmd.Flags().GetString("format")
+
+			opts.Days = days
+			opts.Format = format
+			if days == 0 {
+				opts.Days = 14 // default to 14 days for author search
+			}
+
+			cmd.DisplayHistory(opts)
+		},
+	}
+
 	historyRepoCmd := &cobra.Command{
 		Use:   "repo [repository-name]",
 		Short: "Search history in a specific repository",
 		Long: `Search through Git history of a specific repository.
 
-The search interface will open immediately and results will load progressively
-as they become available. Local commits are shown first, followed by remote commits
-if available.`,
+The search interface will show commits from the specified repository,
+with results loading progressively as they become available.`,
 		Args: cobra.ExactArgs(1),
 		Run: func(cobraCmd *cobra.Command, args []string) {
 			var opts cmd.HistoryOptions
 			opts.Repository = args[0]
 
 			// Get flags
-			author, _ := cobraCmd.Flags().GetString("author")
 			days, _ := cobraCmd.Flags().GetInt("days")
 			format, _ := cobraCmd.Flags().GetString("format")
 
-			opts.Author = author
 			opts.Days = days
 			opts.Format = format
 			if days == 0 {
-				opts.Days = 7
+				opts.Days = 14 // default to 14 days for repo search
 			}
 
 			cmd.DisplayHistory(opts)
@@ -421,9 +426,6 @@ immediate responsiveness.`,
 			opts.Days = 1
 			opts.Format = "detailed"
 
-			author, _ := cobraCmd.Flags().GetString("author")
-			opts.Author = author
-
 			cmd.DisplayHistory(opts)
 		},
 	}
@@ -435,10 +437,7 @@ immediate responsiveness.`,
 
 This command allows you to search through commit history with an emphasis on
 file changes. Results show detailed file statistics and can be filtered by
-file patterns.
-
-The interface opens immediately with progressive loading of results for
-optimal responsiveness.`,
+file patterns.`,
 		Run: func(cobraCmd *cobra.Command, args []string) {
 			var opts cmd.HistoryOptions
 			opts.Format = "files"
@@ -447,9 +446,8 @@ optimal responsiveness.`,
 				opts.Query = args[0]
 			}
 
-			author, _ := cobraCmd.Flags().GetString("author")
+			// Get flags
 			days, _ := cobraCmd.Flags().GetInt("days")
-			opts.Author = author
 			opts.Days = days
 			if days == 0 {
 				opts.Days = 7
@@ -471,14 +469,13 @@ This command provides a statistical overview of Git activity, including:
 - Repository contributions
 
 Results are loaded progressively and shown in a detailed format optimized
-for statistical analysis. Default time range is 30 days.`,
+for statistical analysis.`,
 		Run: func(cobraCmd *cobra.Command, args []string) {
 			var opts cmd.HistoryOptions
 			opts.Format = "stats"
 
-			author, _ := cobraCmd.Flags().GetString("author")
+			// Get flags
 			days, _ := cobraCmd.Flags().GetInt("days")
-			opts.Author = author
 			opts.Days = days
 			if days == 0 {
 				opts.Days = 30 // default to 30 days for stats
@@ -489,11 +486,11 @@ for statistical analysis. Default time range is 30 days.`,
 	}
 
 	// Add flags to history command
-	historyCmd.PersistentFlags().StringP("author", "a", "", "Filter history by author")
-	historyCmd.PersistentFlags().Int("days", 7, "Number of days of history to show")
+	historyCmd.PersistentFlags().Int("days", 0, "Number of days of history to show")
 	historyCmd.PersistentFlags().String("format", "default", "Output format (default, detailed, compact)")
 
 	// Add subcommands to history
+	historyCmd.AddCommand(historyAuthorCmd)
 	historyCmd.AddCommand(historyRepoCmd)
 	historyCmd.AddCommand(historyRecentCmd)
 	historyCmd.AddCommand(historyFilesCmd)

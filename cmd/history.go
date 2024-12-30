@@ -6,8 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -34,17 +34,25 @@ type HistoryOptions struct {
 }
 
 type CommitSummary struct {
-	Hash         string
-	Date         time.Time
-	Message      string
-	FileCount    int
-	Additions    int
-	Deletions    int
-	TotalLines   int
-	FilesChanged []string
-	Branch       string
-	Repository   string
-	Author       string
+	Hash            string
+	Date            time.Time
+	Message         string
+	FileCount       int
+	Additions       int
+	Deletions       int
+	TotalLines      int
+	FilesChanged    []string
+	Branch          string
+	Repository      string
+	Author          string
+	MatchingContent []string // Added to store matching content
+}
+
+// FileResult represents a file and its content
+type FileResult struct {
+	Path         string
+	Content      string
+	LastModified time.Time
 }
 
 // DisplayHistory is the main entry point for the history command
@@ -71,16 +79,20 @@ func loadCommitsProgressively(opts HistoryOptions, commitChan chan<- CommitSumma
 	since := time.Now().AddDate(0, 0, -opts.Days)
 
 	// Use semaphore to limit concurrent git operations
-	sem := make(chan struct{}, 5) // Limit to 5 concurrent git operations
+	sem := make(chan struct{}, 5)
 
-	// First try to get commits from cache
-	cachedCommits := getCachedCommits(opts, since)
-	for _, commit := range cachedCommits {
-		commitChan <- commit
+	// Skip cache for file searches
+	if opts.Format != "files" {
+		// Get commits from cache
+		cachedCommits := getCachedCommits(opts, since)
+		for _, commit := range cachedCommits {
+			commitChan <- commit
+		}
 	}
 
-	// Then process repositories concurrently
+	// Process repositories concurrently
 	cache.Cache.Range(func(path string, repo scan.RepoMetadata) bool {
+		// Skip if repository doesn't match filter
 		if opts.Repository != "" && !matchesRepository(path, opts.Repository) {
 			return true
 		}
@@ -93,36 +105,40 @@ func loadCommitsProgressively(opts HistoryOptions, commitChan chan<- CommitSumma
 
 			repoName := extractRepoName(repoPath)
 			localCommits := getLocalCommitsOptimized(repoPath, opts, since)
-			for _, commit := range localCommits {
+
+			// Filter commits based on command context
+			filteredCommits := filterCommitsByOptions(localCommits, opts)
+			for _, commit := range filteredCommits {
 				commit.Repository = repoName
 				select {
 				case commitChan <- commit:
 				default:
-					// Channel might be closed, skip
 					return
 				}
 			}
 
 			// Only fetch remote data if needed and not too many local commits
 			if len(localCommits) < 100 && shouldFetchRemote(repoPath) {
-				// Fetch remote data in background
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
 					fetchRemoteData(repoPath)
 					remoteCommits := getRemoteCommitsOptimized(repoPath, opts, since)
+
+					// Filter remote commits based on command context
+					filteredRemote := filterCommitsByOptions(remoteCommits, opts)
+
 					// Only send remote commits that aren't in local
 					seenHashes := make(map[string]bool)
 					for _, c := range localCommits {
 						seenHashes[c.Hash] = true
 					}
-					for _, commit := range remoteCommits {
+					for _, commit := range filteredRemote {
 						if !seenHashes[commit.Hash] {
 							commit.Repository = repoName
 							select {
 							case commitChan <- commit:
 							default:
-								// Channel might be closed, skip
 								return
 							}
 						}
@@ -133,11 +149,62 @@ func loadCommitsProgressively(opts HistoryOptions, commitChan chan<- CommitSumma
 		return true
 	})
 
-	// Wait for all goroutines to complete before closing channels
 	wg.Wait()
 	doneChan <- true
 	close(commitChan)
 	close(doneChan)
+}
+
+// filterCommitsByOptions applies filtering based on command context
+func filterCommitsByOptions(commits []CommitSummary, opts HistoryOptions) []CommitSummary {
+	if len(commits) == 0 {
+		return commits
+	}
+
+	filtered := make([]CommitSummary, 0, len(commits))
+	for _, commit := range commits {
+		// Apply author filter if specified
+		if opts.Author != "" && !strings.Contains(commit.Author, opts.Author) {
+			continue
+		}
+
+		// Apply repository filter if specified
+		if opts.Repository != "" && !strings.EqualFold(commit.Repository, opts.Repository) {
+			continue
+		}
+
+		// Apply file pattern filter if specified (for files command)
+		if opts.Query != "" && opts.Format == "files" {
+			hasMatchingFile := false
+			pattern := opts.Query
+			// Convert glob pattern to a more flexible matching pattern
+			if strings.Contains(pattern, "*") {
+				pattern = strings.ReplaceAll(pattern, ".", "\\.")
+				pattern = strings.ReplaceAll(pattern, "*", ".*")
+			}
+			for _, file := range commit.FilesChanged {
+				matched, err := filepath.Match(opts.Query, filepath.Base(file))
+				if err == nil && matched {
+					hasMatchingFile = true
+					break
+				}
+				// Try regex matching if glob matching fails or for more complex patterns
+				if !hasMatchingFile {
+					if matched, _ := regexp.MatchString(pattern+"$", file); matched {
+						hasMatchingFile = true
+						break
+					}
+				}
+			}
+			if !hasMatchingFile {
+				continue
+			}
+		}
+
+		filtered = append(filtered, commit)
+	}
+
+	return filtered
 }
 
 func getCachedCommits(opts HistoryOptions, since time.Time) []CommitSummary {
@@ -167,95 +234,224 @@ func getCachedCommits(opts HistoryOptions, since time.Time) []CommitSummary {
 }
 
 func getLocalCommitsOptimized(repoPath string, opts HistoryOptions, since time.Time) []CommitSummary {
-	var commits []CommitSummary
+	// For file searches, we want to show files and their contents
+	if opts.Format == "files" {
+		var commits []CommitSummary
+		repoName := extractRepoName(repoPath)
 
-	// Build optimized git log command
+		// Get all commits in time range
+		args := []string{
+			"-C", repoPath,
+			"log",
+			"--no-merges",
+			"--format=%H", // Just get commit hashes
+			"--after=" + since.Format("2006-01-02"),
+		}
+
+		cmd := exec.Command("git", args...)
+		output, err := cmd.Output()
+		if err != nil {
+			return nil
+		}
+
+		// Process each commit
+		commitHashes := strings.Split(strings.TrimSpace(string(output)), "\n")
+		for _, hash := range commitHashes {
+			if hash == "" {
+				continue
+			}
+
+			// Get files changed in this commit
+			filesArgs := []string{
+				"-C", repoPath,
+				"diff-tree",
+				"--no-commit-id",
+				"--name-only",
+				"-r",
+				hash,
+			}
+			filesCmd := exec.Command("git", filesArgs...)
+			filesOutput, err := filesCmd.Output()
+			if err != nil {
+				continue
+			}
+
+			files := strings.Split(strings.TrimSpace(string(filesOutput)), "\n")
+			for _, file := range files {
+				if file == "" || !strings.HasSuffix(file, ".go") {
+					continue
+				}
+
+				// Get file content at this commit
+				contentArgs := []string{
+					"-C", repoPath,
+					"show",
+					hash + ":" + file,
+				}
+				contentCmd := exec.Command("git", contentArgs...)
+				content, err := contentCmd.Output()
+				if err != nil {
+					continue
+				}
+
+				// Get commit info
+				infoArgs := []string{
+					"-C", repoPath,
+					"show",
+					"--format=%H%n%aI%n%an%n%ae%n%s",
+					"-s",
+					hash,
+				}
+				infoCmd := exec.Command("git", infoArgs...)
+				info, err := infoCmd.Output()
+				if err != nil {
+					continue
+				}
+
+				commit := parseFileCommit(string(info), file)
+				if commit != nil {
+					commit.Repository = repoName
+					commit.MatchingContent = []string{string(content)}
+					commits = append(commits, *commit)
+				}
+			}
+		}
+		return commits
+	}
+
+	// For other modes, use the existing commit history logic
 	args := []string{
 		"-C", repoPath,
 		"log",
 		"--no-merges",
-		"--date-order",
-		"--pretty=format:%H%x00%aI%x00%an%x00%ae%x00%s%x00",
-		"--numstat",
+		"--name-only",
+		"--format=%H%n%aI%n%an%n%ae%n%s%n%x00",
 		"--after=" + since.Format("2006-01-02"),
-		"--max-count=1000", // Limit to prevent excessive processing
+		"--max-count=1000",
 	}
 
 	if opts.Author != "" {
 		args = append(args, "--author="+opts.Author)
 	}
 
-	// Add branch filtering if specified
 	if opts.Branch != "" {
 		args = append(args, opts.Branch)
 	} else {
 		args = append(args, "--all")
 	}
 
-	// Execute command with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd := exec.CommandContext(context.Background(), "git", args...)
 	output, err := cmd.Output()
 	if err != nil {
 		if config.AppConfig.Debug {
 			fmt.Printf("Error getting local commits from %s: %v\n", repoPath, err)
 		}
-		return commits
+		return nil
 	}
 
-	return parseGitLogOptimized(string(output))
+	return parseGitLogWithPatch(string(output), opts)
 }
 
-func parseGitLogOptimized(output string) []CommitSummary {
+func parseFileCommit(output string, file string) *CommitSummary {
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	if len(lines) < 5 {
+		return nil
+	}
+
+	hash := lines[0]
+	date, _ := time.Parse(time.RFC3339, lines[1])
+	authorName := lines[2]
+	authorEmail := lines[3]
+	message := lines[4]
+
+	return &CommitSummary{
+		Hash:         hash,
+		Date:         date,
+		Message:      message,
+		FileCount:    1,
+		Author:       fmt.Sprintf("%s <%s>", authorName, authorEmail),
+		FilesChanged: []string{file},
+	}
+}
+
+func isGrepNoMatchError(err error) bool {
+	if exitErr, ok := err.(*exec.ExitError); ok {
+		return exitErr.ExitCode() == 1
+	}
+	return false
+}
+
+func parseGitLogWithPatch(output string, opts HistoryOptions) []CommitSummary {
 	var commits []CommitSummary
-	entries := strings.Split(output, "\n\n")
+	entries := strings.Split(output, "\x00")
 
 	for _, entry := range entries {
 		if entry == "" {
 			continue
 		}
 
-		lines := strings.Split(entry, "\n")
-		if len(lines) == 0 {
+		// Split entry into lines
+		lines := strings.Split(strings.TrimSpace(entry), "\n")
+		if len(lines) < 5 { // Need at least hash, date, author name, email, and message
 			continue
 		}
 
-		// Parse commit info more efficiently
-		parts := strings.Split(lines[0], "\x00")
-		if len(parts) < 5 {
-			continue
+		// Parse basic commit info
+		hash := lines[0]
+		date, _ := time.Parse(time.RFC3339, lines[1])
+		authorName := lines[2]
+		authorEmail := lines[3]
+		message := lines[4]
+
+		// Process the patch to extract changed files and matching content
+		var filesChanged []string
+		var matchingContent []string
+		var additions, deletions int
+		inPatch := false
+		currentFile := ""
+
+		for i := 5; i < len(lines); i++ {
+			line := lines[i]
+			if strings.HasPrefix(line, "diff --git") {
+				inPatch = true
+				// Extract filename from diff header
+				parts := strings.Split(line, " b/")
+				if len(parts) > 1 {
+					currentFile = parts[1]
+					filesChanged = append(filesChanged, currentFile)
+				}
+			} else if inPatch {
+				if strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++") {
+					additions++
+					// If we're searching for content and this line contains it
+					if opts.Format == "files" && opts.Query != "" && !strings.Contains(opts.Query, "*") {
+						if strings.Contains(line, opts.Query) {
+							matchingContent = append(matchingContent, fmt.Sprintf("%s: %s", currentFile, strings.TrimPrefix(line, "+")))
+						}
+					}
+				} else if strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "---") {
+					deletions++
+				}
+			}
 		}
 
-		date, _ := time.Parse(time.RFC3339, parts[1])
-
-		// Process stats in batches
-		var additions, deletions, fileCount int
-		for _, line := range lines[1:] {
-			if line == "" {
-				continue
-			}
-			statParts := strings.Fields(line)
-			if len(statParts) < 3 {
-				continue
-			}
-			add, _ := strconv.Atoi(statParts[0])
-			del, _ := strconv.Atoi(statParts[1])
-			additions += add
-			deletions += del
-			fileCount++
+		// Only include commits that have matching content
+		if opts.Format == "files" && opts.Query != "" && !strings.Contains(opts.Query, "*") && len(matchingContent) == 0 {
+			continue
 		}
 
 		commits = append(commits, CommitSummary{
-			Hash:       parts[0],
-			Date:       date,
-			Message:    parts[4],
-			FileCount:  fileCount,
-			Additions:  additions,
-			Deletions:  deletions,
-			TotalLines: additions + deletions,
-			Author:     fmt.Sprintf("%s <%s>", parts[2], parts[3]),
+			Hash:         hash,
+			Date:         date,
+			Message:      message,
+			FileCount:    len(filesChanged),
+			Additions:    additions,
+			Deletions:    deletions,
+			TotalLines:   additions + deletions,
+			Author:       fmt.Sprintf("%s <%s>", authorName, authorEmail),
+			FilesChanged: filesChanged,
+			// Store matching content for display
+			MatchingContent: matchingContent,
 		})
 	}
 
@@ -297,10 +493,10 @@ func getRemoteCommitsOptimized(repoPath string, opts HistoryOptions, since time.
 				"-C", repoPath,
 				"log",
 				"--no-merges",
-				"--date-order",
+				"--patch",                              // Show the actual changes
+				"--unified=3",                          // Show 3 lines of context
+				"--format=%H%n%aI%n%an%n%ae%n%s%n%x00", // Use newlines and null byte as separators
 				branchName,
-				"--pretty=format:%H%x00%aI%x00%an%x00%ae%x00%s%x00",
-				"--numstat",
 				"--after=" + since.Format("2006-01-02"),
 				"--max-count=500", // Limit per branch
 			}
@@ -309,13 +505,22 @@ func getRemoteCommitsOptimized(repoPath string, opts HistoryOptions, since time.
 				args = append(args, "--author="+opts.Author)
 			}
 
+			// Add file filter if in files mode
+			if opts.Format == "files" && opts.Query != "" {
+				if strings.Contains(opts.Query, "*") {
+					args = append(args, "--", fmt.Sprintf("*%s", strings.TrimPrefix(opts.Query, "*")))
+				} else {
+					args = append(args, "-G", opts.Query) // -G uses basic regex for matching
+				}
+			}
+
 			cmd := exec.CommandContext(ctx, "git", args...)
 			output, err := cmd.Output()
 			if err != nil {
 				return
 			}
 
-			branchCommits := parseGitLogOptimized(string(output))
+			branchCommits := parseGitLogWithPatch(string(output), opts)
 
 			mu.Lock()
 			commits = append(commits, branchCommits...)
@@ -328,32 +533,35 @@ func getRemoteCommitsOptimized(repoPath string, opts HistoryOptions, since time.
 }
 
 func displayInteractiveHistoryProgressive(commitChan <-chan CommitSummary, doneChan <-chan bool, opts HistoryOptions) {
-	// Convert commits to search results as they arrive
 	resultsChan := make(chan search.SearchResult, 100)
 	go func() {
 		defer close(resultsChan)
-
 		seen := make(map[string]bool)
+
 		for {
 			select {
 			case commit, ok := <-commitChan:
 				if !ok {
 					return
 				}
-				// Deduplicate commits
 				if !seen[commit.Hash] {
 					seen[commit.Hash] = true
-					resultsChan <- search.SearchResult{
-						Hash:       commit.Hash,
-						Date:       commit.Date,
-						Message:    commit.Message,
-						FileCount:  commit.FileCount,
-						Additions:  commit.Additions,
-						Deletions:  commit.Deletions,
-						Repository: commit.Repository,
-						Branch:     commit.Branch,
-						Author:     commit.Author,
+					result := search.SearchResult{
+						Hash:         commit.Hash,
+						Date:         commit.Date,
+						Author:       commit.Author,
+						Message:      commit.Message,
+						Repository:   commit.Repository,
+						FileCount:    commit.FileCount,
+						FilesChanged: commit.FilesChanged,
 					}
+
+					// For file mode, show file path as the main message
+					if opts.Format == "files" && len(commit.FilesChanged) > 0 {
+						result.Message = commit.FilesChanged[0] // Use the file path as message
+					}
+
+					resultsChan <- result
 				}
 			case <-doneChan:
 				return
@@ -363,8 +571,8 @@ func displayInteractiveHistoryProgressive(commitChan <-chan CommitSummary, doneC
 
 	// Configure search options
 	searchOpts := search.SearchOptions{
-		Preview:     opts.Preview,
-		DetailLevel: boolToInt(opts.Detailed),
+		Preview:     true,
+		DetailLevel: getDetailLevelForFormat(opts.Format),
 		Repository:  opts.Repository,
 		Author:      opts.Author,
 		Interactive: true,
@@ -372,46 +580,33 @@ func displayInteractiveHistoryProgressive(commitChan <-chan CommitSummary, doneC
 		Progressive: true,
 	}
 
-	// Run interactive search with progressive loading
+	// Run interactive search
 	selected, err := search.RunInteractiveSearchProgressive(resultsChan, searchOpts)
 	if err != nil {
-		if err.Error() == "fzf is not installed" {
-			fmt.Println("Interactive search requires fzf. Falling back to table view.")
-			// Collect remaining commits for table view
-			var commits []CommitSummary
-			for commit := range commitChan {
-				commits = append(commits, commit)
-			}
-			displayTableHistory(commits, opts)
-			return
-		}
 		fmt.Printf("Error during interactive search: %v\n", err)
 		return
 	}
 
-	// Handle selected commits if any
 	if len(selected) > 0 {
-		handleSelectedCommits(selected)
+		handleSelectedFiles(selected)
 	}
 }
 
-func handleSelectedCommits(commits []search.SearchResult) {
-	fmt.Printf("\nSelected %d commits:\n\n", len(commits))
+func handleSelectedFiles(files []search.SearchResult) {
+	// Handle file selection if needed
+	// This could open files in editor, show diff history, etc.
+}
 
-	t := table.NewWriter()
-	t.SetStyle(table.StyleRounded)
-	t.AppendHeader(table.Row{"Date", "Repository", "Message", "Changes"})
-
-	for _, commit := range commits {
-		t.AppendRow(table.Row{
-			commit.Date.Format("2006-01-02 15:04"),
-			commit.Repository,
-			commit.Message,
-			fmt.Sprintf("+%d/-%d", commit.Additions, commit.Deletions),
-		})
+// getDetailLevelForFormat returns appropriate detail level based on format
+func getDetailLevelForFormat(format string) int {
+	switch format {
+	case "detailed", "stats", "files":
+		return 2
+	case "compact":
+		return 0
+	default:
+		return 1
 	}
-
-	fmt.Println(t.Render())
 }
 
 func shouldFetchRemote(repoPath string) bool {
@@ -562,4 +757,29 @@ func sortCommitsByDate(commits []CommitSummary) {
 	sort.Slice(commits, func(i, j int) bool {
 		return commits[i].Date.After(commits[j].Date)
 	})
+}
+
+// filterMatchingFiles returns files that match the given pattern
+func filterMatchingFiles(files []string, pattern string) []string {
+	if pattern == "" {
+		return files
+	}
+
+	var matched []string
+	for _, file := range files {
+		// Try direct glob matching first
+		if m, err := filepath.Match(pattern, filepath.Base(file)); err == nil && m {
+			matched = append(matched, filepath.Base(file))
+			continue
+		}
+
+		// If the pattern contains *, convert to regex for more complex matches
+		if strings.Contains(pattern, "*") {
+			regexPattern := "^" + strings.ReplaceAll(regexp.QuoteMeta(pattern), "\\*", ".*") + "$"
+			if m, err := regexp.MatchString(regexPattern, filepath.Base(file)); err == nil && m {
+				matched = append(matched, filepath.Base(file))
+			}
+		}
+	}
+	return matched
 }
