@@ -131,14 +131,8 @@ func (c *DefaultStatsCalculator) CalculateTableWidth() int {
     return min(width-2, maxTableWidth)
 }
 
-
-// TODO: Function too long, refactor and split into smaller functions for better readability and maintainability
-func buildProjectsSection() string {
-	if !config.AppConfig.DisplayStats.ShowActiveProjects {
-		return ""
-	}
-
-	// Convert map to slice for sorting
+// prepareRepoData converts the cache map into a sorted slice of repository information
+func prepareRepoData() []repoInfo {
 	repos := make([]repoInfo, 0, len(cache.Cache))
 	for path, repo := range cache.Cache {
 		repoName := path[strings.LastIndex(path, "/")+1:]
@@ -154,24 +148,14 @@ func buildProjectsSection() string {
 		return repos[i].lastCommit.After(repos[j].lastCommit)
 	})
 
-	// Create buffer for table
-	buf := new(bytes.Buffer)
+	return repos
+}
+
+// initializeTable creates and configures a new table writer with proper settings
+func initializeTable(tableWidth int) table.Writer {
 	t := table.NewWriter()
-	t.SetOutputMirror(buf)
-
-	// Add Table Header if Set in config
-	if config.AppConfig.DisplayStats.TableStyle.UseTableHeader{
-		t.AppendHeader(table.Row{
-			"Repo",
-			"Weekly",
-			"Streak",
-			"Changes",
-			"Activity",
-		})
-	}
-
-    // Configure table column widths
-    tableWidth := calculator.CalculateTableWidth()
+	
+	// Configure table column widths
 	t.SetColumnConfigs([]table.ColumnConfig{
 		{Number: 1, WidthMax: int(float64(tableWidth) * 0.35)}, // Repository name
 		{Number: 2, WidthMax: int(float64(tableWidth) * 0.15)}, // Weekly commits
@@ -183,48 +167,99 @@ func buildProjectsSection() string {
 	// Set overall table width
 	t.SetAllowedRowLength(tableWidth)
 
+	// Add Table Header if Set in config
+	if config.AppConfig.DisplayStats.TableStyle.UseTableHeader {
+		t.AppendHeader(table.Row{
+			"Repo",
+			"Weekly",
+			"Streak",
+			"Changes",
+			"Activity",
+		})
+	}
+
+	return t
+}
+
+// formatActivityIndicator determines the activity indicator based on commit count
+func formatActivityIndicator(weeklyCommits int) string {
+	indicators := config.AppConfig.DisplayStats.ActivityIndicators
+	thresholds := config.AppConfig.DisplayStats.Thresholds
+
+	if weeklyCommits > thresholds.HighActivity {
+		return indicators.HighActivity
+	} else if weeklyCommits == 0 {
+		return indicators.NoActivity
+	}
+	return indicators.NormalActivity
+}
+
+// formatStreakString formats the streak display with appropriate indicators
+func formatStreakString(currentStreak, longestStreak int) string {
+	indicators := config.AppConfig.DisplayStats.ActivityIndicators
+	streakStr := fmt.Sprintf("%dd", currentStreak)
+	
+	if currentStreak == longestStreak && currentStreak > 0 {
+		streakStr += indicators.StreakRecord
+	} else if currentStreak > 0 {
+		streakStr += indicators.ActiveStreak
+	}
+	
+	return streakStr
+}
+
+// calculateWeeklyChanges calculates total additions and deletions for the week
+func calculateWeeklyChanges(commitHistory []scan.CommitHistory) (int, int) {
+	var weeklyAdditions, weeklyDeletions int
+	weekStart := time.Now().AddDate(0, 0, -daysInWeek)
+	
+	for _, commit := range commitHistory {
+		if commit.Date.After(weekStart) {
+			weeklyAdditions += commit.Additions
+			weeklyDeletions += commit.Deletions
+		}
+	}
+	
+	return weeklyAdditions, weeklyDeletions
+}
+
+// formatLastActivity formats the time since last commit
+func formatLastActivity(lastCommit time.Time) string {
+	if hours := time.Since(lastCommit).Hours(); hours > hoursInDay {
+		return fmt.Sprintf("%dd ago", int(hours/hoursInDay))
+	}
+	return "today"
+}
+
+// buildProjectsSection - Displays stats for all active repositories in a more compact format
+func buildProjectsSection() string {
+	if !config.AppConfig.DisplayStats.ShowActiveProjects {
+		return ""
+	}
+
+	// Create buffer for table
+	buf := new(bytes.Buffer)
+	
+	// Get sorted repo data
+	repos := prepareRepoData()
+	
+	// Initialize table with proper width
+	tableWidth := calculator.CalculateTableWidth()
+	t := initializeTable(tableWidth)
+	t.SetOutputMirror(buf)
+
+	// Process each repository
 	displayCount := min(len(repos), config.AppConfig.DisplayStats.MaxProjects)
 	for i := 0; i < displayCount; i++ {
 		repo := repos[i]
-			meta := repo.metadata
+		meta := repo.metadata
 
-		// Use configured activity indicators
-		indicators := config.AppConfig.DisplayStats.ActivityIndicators
-		thresholds := config.AppConfig.DisplayStats.Thresholds
+		activity := formatActivityIndicator(meta.WeeklyCommits)
+		streakStr := formatStreakString(meta.CurrentStreak, meta.LongestStreak)
+		weeklyAdd, weeklyDel := calculateWeeklyChanges(meta.CommitHistory)
+		activityStr := formatLastActivity(repo.lastCommit)
+		changesStr := fmt.Sprintf("+%d/-%d", weeklyAdd, weeklyDel)
 
-		activity := indicators.NormalActivity
-		if meta.WeeklyCommits > thresholds.HighActivity {
-			activity = indicators.HighActivity
-		} else if meta.WeeklyCommits == 0 {
-			activity = indicators.NoActivity
-		}
-
-		// Format streak with configured indicators
-		streakStr := fmt.Sprintf("%dd", meta.CurrentStreak)
-		if meta.CurrentStreak == meta.LongestStreak && meta.CurrentStreak > 0 {
-			streakStr += indicators.StreakRecord
-		} else if meta.CurrentStreak > 0 {
-			streakStr += indicators.ActiveStreak
-		}
-
-		// Format activity
-		activityStr := "today"
-		if hours := time.Since(repo.lastCommit).Hours(); hours > hoursInDay {
-			activityStr = fmt.Sprintf("%dd ago", int(hours/hoursInDay))
-		}
-
-		// Calculate weekly changes
-		var weeklyAdditions, weeklyDeletions int
-		weekStart := time.Now().AddDate(0, 0, -daysInWeek)
-		for _, commit := range meta.CommitHistory {
-			if commit.Date.After(weekStart) {
-				weeklyAdditions += commit.Additions
-				weeklyDeletions += commit.Deletions
-			}
-		}
-		changesStr := fmt.Sprintf("+%d/-%d", weeklyAdditions, weeklyDeletions)
-
-		// Append row with all formatted data
 		t.AppendRow(table.Row{
 			repo.name,
 			fmt.Sprintf("%d%s", meta.WeeklyCommits, activity),
@@ -234,7 +269,7 @@ func buildProjectsSection() string {
 		})
 	}
 
-	// switch statement to check for user style setting in config
+	// Apply table style
 	switch strings.ToLower(config.AppConfig.DisplayStats.TableStyle.Style) {
 	case "rounded":
 		t.SetStyle(table.StyleRounded)
@@ -248,7 +283,6 @@ func buildProjectsSection() string {
 		t.SetStyle(table.StyleDefault)
 	}
 
-	// Render to buffer and return
 	t.Render()
 	return buf.String()
 }
