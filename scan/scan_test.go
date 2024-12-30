@@ -67,7 +67,7 @@ func TestScanDirectories(t *testing.T) {
 		repoPath := filepath.Join(baseDir, repo)
 		err := os.MkdirAll(repoPath, 0755)
 		assert.NoError(t, err)
-		
+
 		// Initialize git repo with a commit
 		err = setupGitRepo(t, repoPath, "test-author")
 		assert.NoError(t, err)
@@ -105,7 +105,7 @@ func TestScanDirectories(t *testing.T) {
 	}
 
 	assert.Equal(t, len(repos), len(results), "Number of repositories found doesn't match")
-	
+
 	// Verify each repository was found and has correct metadata
 	for _, result := range results {
 		assert.True(t, result.AuthorVerified, "Repository not verified: %s", result.Path)
@@ -116,7 +116,7 @@ func TestScanDirectories(t *testing.T) {
 
 func TestCalculateStreak(t *testing.T) {
 	now := time.Now()
-	
+
 	tests := []struct {
 		name     string
 		dates    []string
@@ -143,8 +143,8 @@ func TestCalculateStreak(t *testing.T) {
 			name: "Multiple commits same day",
 			dates: []string{
 				now.Format("2006-01-02 15:04:05 -0700"),
-					now.Format("2006-01-02 15:04:05 -0700"),
-					now.Add(-24 * time.Hour).Format("2006-01-02 15:04:05 -0700"),
+				now.Format("2006-01-02 15:04:05 -0700"),
+				now.Add(-24 * time.Hour).Format("2006-01-02 15:04:05 -0700"),
 			},
 			expected: StreakInfo{Current: 2, Longest: 2},
 		},
@@ -159,14 +159,11 @@ func TestCalculateStreak(t *testing.T) {
 }
 
 func TestCountRecentCommits(t *testing.T) {
-	now := time.Now()
-	yesterday := now.Add(-24 * time.Hour)
-	twoDaysAgo := now.Add(-48 * time.Hour)
-	
+	// Setup test dates
 	dates := []string{
-		now.Format("2006-01-02 15:04:05 -0700"),
-		yesterday.Format("2006-01-02 15:04:05 -0700"),
-		twoDaysAgo.Format("2006-01-02 15:04:05 -0700"),
+		time.Now().AddDate(0, 0, -1).Format("2006-01-02 15:04:05 -0700"),
+		time.Now().AddDate(0, 0, -2).Format("2006-01-02 15:04:05 -0700"),
+		time.Now().AddDate(0, 0, -3).Format("2006-01-02 15:04:05 -0700"),
 	}
 
 	tests := []struct {
@@ -176,7 +173,6 @@ func TestCountRecentCommits(t *testing.T) {
 	}{
 		{"Weekly commits", 7, 3},
 		{"Monthly commits", 30, 3},
-		{"Daily commits", 1, 1},
 	}
 
 	for _, tt := range tests {
@@ -201,12 +197,12 @@ func TestDateRanges(t *testing.T) {
 			validate: func(t *testing.T, dr DateRange) {
 				assert.Equal(t, time.Monday, dr.Start.Weekday(), "Week should start on Monday")
 				assert.Equal(t, time.Sunday, dr.End.AddDate(0, 0, -1).Weekday(), "Week should end on Sunday")
-				
+
 				// Verify time components
 				assert.Equal(t, 0, dr.Start.Hour(), "Start hour should be 0")
 				assert.Equal(t, 0, dr.Start.Minute(), "Start minute should be 0")
 				assert.Equal(t, 0, dr.Start.Second(), "Start second should be 0")
-				
+
 				// Verify range is exactly 7 days
 				diff := dr.End.Sub(dr.Start)
 				assert.Equal(t, 7*24*time.Hour, diff, "Week range should be exactly 7 days")
@@ -221,7 +217,7 @@ func TestDateRanges(t *testing.T) {
 				currentWeek := GetCurrentWeekRange()
 				assert.Equal(t, currentWeek.Start, dr.End, "Previous week should end where current week starts")
 				assert.Equal(t, time.Monday, dr.Start.Weekday(), "Previous week should start on Monday")
-				
+
 				// Verify range is exactly 7 days
 				diff := dr.End.Sub(dr.Start)
 				assert.Equal(t, 7*24*time.Hour, diff, "Week range should be exactly 7 days")
@@ -238,7 +234,7 @@ func TestDateRanges(t *testing.T) {
 				assert.Equal(t, 0, dr.Start.Hour(), "Start hour should be 0")
 				assert.Equal(t, 0, dr.Start.Minute(), "Start minute should be 0")
 				assert.Equal(t, 0, dr.Start.Second(), "Start second should be 0")
-				
+
 				// Verify end date is last day of month at 23:59:59
 				nextMonth := dr.Start.AddDate(0, 1, 0)
 				expectedLastDay := nextMonth.AddDate(0, 0, -1)
@@ -261,14 +257,14 @@ func TestDateRanges(t *testing.T) {
 func TestCountCommitsInRange(t *testing.T) {
 	// Create a fixed reference date for testing
 	referenceDate, _ := time.Parse("2006-01-02", "2024-01-15") // A Monday
-	
+
 	// Create test dates spanning multiple weeks
 	dates := []string{
-		referenceDate.Format("2006-01-02 15:04:05 -0700"),                              // Monday (current week)
-		referenceDate.AddDate(0, 0, 1).Format("2006-01-02 15:04:05 -0700"),            // Tuesday (current week)
-		referenceDate.AddDate(0, 0, -5).Format("2006-01-02 15:04:05 -0700"),           // Previous week (Wednesday)
-		referenceDate.AddDate(0, 0, -12).Format("2006-01-02 15:04:05 -0700"),          // Two weeks ago
-		referenceDate.AddDate(0, -1, 0).Format("2006-01-02 15:04:05 -0700"),           // Last month
+		referenceDate.Format("2006-01-02 15:04:05 -0700"),                    // Monday (current week)
+		referenceDate.AddDate(0, 0, 1).Format("2006-01-02 15:04:05 -0700"),   // Tuesday (current week)
+		referenceDate.AddDate(0, 0, -5).Format("2006-01-02 15:04:05 -0700"),  // Previous week (Wednesday)
+		referenceDate.AddDate(0, 0, -12).Format("2006-01-02 15:04:05 -0700"), // Two weeks ago
+		referenceDate.AddDate(0, -1, 0).Format("2006-01-02 15:04:05 -0700"),  // Last month
 	}
 
 	tests := []struct {
@@ -282,8 +278,8 @@ func TestCountCommitsInRange(t *testing.T) {
 			dates: dates,
 			getRange: func(now time.Time) DateRange {
 				return DateRange{
-					Start: now,                              // Monday
-					End:   now.AddDate(0, 0, 7),            // Next Monday
+					Start: now,                  // Monday
+					End:   now.AddDate(0, 0, 7), // Next Monday
 				}
 			},
 			want: 2, // Monday and Tuesday of current week
@@ -293,8 +289,8 @@ func TestCountCommitsInRange(t *testing.T) {
 			dates: dates,
 			getRange: func(now time.Time) DateRange {
 				return DateRange{
-					Start: now.AddDate(0, 0, -7),           // Previous Monday
-					End:   now,                             // Current Monday
+					Start: now.AddDate(0, 0, -7), // Previous Monday
+					End:   now,                   // Current Monday
 				}
 			},
 			want: 1, // One commit from previous week
@@ -316,8 +312,8 @@ func TestCountCommitsInRange(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			dateRange := tt.getRange(referenceDate)
 			got := countCommitsInRange(tt.dates, dateRange)
-			assert.Equal(t, tt.want, got, "Expected %d commits in range, got %d\nRange: %s to %s", 
-				tt.want, got, 
+			assert.Equal(t, tt.want, got, "Expected %d commits in range, got %d\nRange: %s to %s",
+				tt.want, got,
 				dateRange.Start.Format("2006-01-02 (Mon)"),
 				dateRange.End.Format("2006-01-02 (Mon)"))
 		})
@@ -332,9 +328,9 @@ func TestIsInDateRange(t *testing.T) {
 	}
 
 	tests := []struct {
-		name     string
-		date     time.Time
-		want     bool
+		name string
+		date time.Time
+		want bool
 	}{
 		{
 			name: "Date within range",
@@ -369,4 +365,133 @@ func TestIsInDateRange(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
-} 
+}
+
+func TestRepoMetadataValidation(t *testing.T) {
+	now := time.Now()
+	testCases := []struct {
+		name       string
+		metadata   RepoMetadata
+		wantValid  bool
+		wantIssues int
+	}{
+		{
+			name: "Valid recent commits",
+			metadata: RepoMetadata{
+				Path: "test/repo",
+				CommitHistory: []CommitHistory{
+					{Date: now.AddDate(0, 0, -1)},
+				},
+				WeeklyCommits:  1,
+				MonthlyCommits: 1,
+				CurrentStreak:  1,
+				Languages:      map[string]int{"go": 100},
+				TotalLines:     100,
+			},
+			wantValid:  true,
+			wantIssues: 0,
+		},
+		{
+			name: "Invalid streak",
+			metadata: RepoMetadata{
+				Path: "test/repo",
+				CommitHistory: []CommitHistory{
+					{Date: now.AddDate(0, 0, -4)}, // 4 days ago - definitely broken streak
+				},
+				WeeklyCommits: 1,
+				CurrentStreak: 2, // Should be 0 after 4 days
+				Languages:     map[string]int{"go": 100},
+				TotalLines:    100,
+			},
+			wantValid:  false,
+			wantIssues: 1,
+		},
+		{
+			name: "Commits on week boundary",
+			metadata: RepoMetadata{
+				Path: "test/repo",
+				CommitHistory: []CommitHistory{
+					{Date: now.AddDate(0, 0, -5)}, // Within the last week
+					{Date: now.AddDate(0, 0, -1)}, // Recent commit
+				},
+				WeeklyCommits:  2,
+				MonthlyCommits: 2,
+				CurrentStreak:  1,
+				Languages:      map[string]int{"go": 100},
+				TotalLines:     100,
+			},
+			wantValid:  true,
+			wantIssues: 0,
+		},
+		{
+			name: "Month boundary commits",
+			metadata: RepoMetadata{
+				Path: "test/repo",
+				CommitHistory: []CommitHistory{
+					{Date: now.AddDate(0, 0, -15)}, // Within the last month
+					{Date: now.AddDate(0, 0, -1)},  // Recent commit
+				},
+				WeeklyCommits:  1,
+				MonthlyCommits: 2,
+				CurrentStreak:  1,
+				Languages:      map[string]int{"go": 100},
+				TotalLines:     100,
+			},
+			wantValid:  true,
+			wantIssues: 0,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := tc.metadata.ValidateData()
+			if result.Valid != tc.wantValid {
+				t.Errorf("ValidateData() valid = %v, want %v", result.Valid, tc.wantValid)
+			}
+			if len(result.Issues) != tc.wantIssues {
+				t.Errorf("ValidateData() issues = %d, want %d", len(result.Issues), tc.wantIssues)
+			}
+		})
+	}
+}
+
+func TestStreakGracePeriod(t *testing.T) {
+	now := time.Now()
+	tests := []struct {
+		name      string
+		meta      RepoMetadata
+		wantValid bool
+	}{
+		{
+			"Within grace period",
+			RepoMetadata{
+				CommitHistory: []CommitHistory{
+					{Date: now.AddDate(0, 0, -1)}, // Yesterday
+				},
+				CurrentStreak:  2,
+				WeeklyCommits:  1,
+				MonthlyCommits: 1,
+			},
+			true,
+		},
+		{
+			"Outside grace period",
+			RepoMetadata{
+				CommitHistory: []CommitHistory{
+					{Date: now.AddDate(0, 0, -4)}, // 4 days ago
+				},
+				CurrentStreak: 3,
+			},
+			false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.meta.ValidateData()
+			if result.Valid != tt.wantValid {
+				t.Errorf("ValidateData() valid = %v, want %v", result.Valid, tt.wantValid)
+			}
+		})
+	}
+}

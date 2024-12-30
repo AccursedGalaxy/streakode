@@ -10,19 +10,20 @@ import (
 	"sync"
 	"time"
 
+	"github.com/AccursedGalaxy/streakode/config"
 	"github.com/AccursedGalaxy/streakode/scan"
 )
 
 // in-memory cache to hold repo metadata during runtime
 var (
-	Cache map[string]scan.RepoMetadata
+	Cache    map[string]scan.RepoMetadata
 	metadata CacheMetadata
-	mutex sync.RWMutex
+	mutex    sync.RWMutex
 )
 
 type CacheMetadata struct {
-	LastRefresh	time.Time
-	Version		string		// For Future Version Tracking
+	LastRefresh time.Time
+	Version     string // For Future Version Tracking
 }
 
 // InitCache - Initializes the in memory cache
@@ -189,6 +190,21 @@ func RefreshCache(dirs []string, author string, cacheFilePath string, excludedPa
 	for _, repo := range repos {
 		if NeedsRefresh(repo.Path, repo.LastCommit) {
 			Cache[repo.Path] = repo
+		}
+	}
+
+	// Validate all repo data before saving
+	if config.AppConfig.Debug {
+		fmt.Println("Debug: Validating repository data...")
+	}
+
+	for i, repo := range repos {
+		result := repo.ValidateData()
+		if !result.Valid {
+			fmt.Printf("Warning: Data validation issues found in repo %d:\n", i)
+			for _, issue := range result.Issues {
+				fmt.Printf("  - %s\n", issue)
+			}
 		}
 	}
 
