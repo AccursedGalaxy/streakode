@@ -12,33 +12,33 @@ import (
 )
 
 type Config struct {
-	Author          string   `mapstructure:"author"`
+	Author           string   `mapstructure:"author"`
 	DormantThreshold int      `mapstructure:"dormant_threshold"`
-	ScanDirectories []string `mapstructure:"scan_directories"`
-	ScanSettings struct {
+	ScanDirectories  []string `mapstructure:"scan_directories"`
+	ScanSettings     struct {
 		ExcludedPatterns []string `mapstructure:"excluded_patterns"` // e.g., ["node_modules", "dist", ".git"]
 		ExcludedPaths    []string `mapstructure:"excluded_paths"`    // Full paths to exclude
 	} `mapstructure:"scan_settings"`
-	RefreshInterval int      `mapstructure:"refresh_interval"`
+	RefreshInterval int `mapstructure:"refresh_interval"`
 	DisplayStats    struct {
 		ShowWelcomeMessage bool `mapstructure:"show_welcome_message"`
 		ShowActiveProjects bool `mapstructure:"show_active_projects"`
-		ShowInsights      bool `mapstructure:"show_insights"`
-		MaxProjects       int  `mapstructure:"max_projects"`
-		TableStyle struct {
-			UseTableHeader 	bool 		`mapstructure:"use_table_header"`
-			Style			string		`mapstructure:"style"`
-			Options struct {
-				DrawBorder	bool	`mapstructure:"draw_border"`
-				SeparateColumns bool	`mapstructure:"separate_columns"`
-				SeparateHeader bool	`mapstructure:"separate_header"`
-				SeparateRows bool	`mapstructure:"separate_rows"`
+		ShowInsights       bool `mapstructure:"show_insights"`
+		MaxProjects        int  `mapstructure:"max_projects"`
+		TableStyle         struct {
+			UseTableHeader bool   `mapstructure:"use_table_header"`
+			Style          string `mapstructure:"style"`
+			Options        struct {
+				DrawBorder      bool `mapstructure:"draw_border"`
+				SeparateColumns bool `mapstructure:"separate_columns"`
+				SeparateHeader  bool `mapstructure:"separate_header"`
+				SeparateRows    bool `mapstructure:"separate_rows"`
 			} `mapstructure:"options"`
 		} `mapstructure:"table_style"`
 		ActivityIndicators struct {
-			HighActivity    string `mapstructure:"high_activity"`
-			NormalActivity  string `mapstructure:"normal_activity"`
-			NoActivity      string `mapstructure:"no_activity"`
+			HighActivity   string `mapstructure:"high_activity"`
+			NormalActivity string `mapstructure:"normal_activity"`
+			NoActivity     string `mapstructure:"no_activity"`
 			StreakRecord   string `mapstructure:"streak_record"`
 			ActiveStreak   string `mapstructure:"active_streak"`
 		} `mapstructure:"activity_indicators"`
@@ -55,14 +55,14 @@ type Config struct {
 			ShowMostActive    bool `mapstructure:"show_most_active"`
 		} `mapstructure:"insight_settings"`
 	} `mapstructure:"display_stats"`
-	GoalSettings    struct {
+	GoalSettings struct {
 		WeeklyCommitGoal int `mapstructure:"weekly_commit_goal"`
 	} `mapstructure:"goal_settings"`
 	Colors struct {
-		HeaderColor  string `mapstructure:"header_color"`
+		HeaderColor string `mapstructure:"header_color"`
 	}
-	DetailedStats bool `mapstructure:"detailed_stats"`
-	Debug         bool `mapstructure:"debug"`
+	DetailedStats    bool `mapstructure:"detailed_stats"`
+	Debug            bool `mapstructure:"debug"`
 	LanguageSettings struct {
 		ExcludedExtensions []string `mapstructure:"excluded_extensions"` // e.g., [".yaml", ".txt", ".md"]
 		ExcludedLanguages  []string `mapstructure:"excluded_languages"`  // e.g., ["YAML", "Text", "Markdown"]
@@ -70,29 +70,33 @@ type Config struct {
 		ShowDividers       bool     `mapstructure:"show_dividers"`       // Display dividers between languages in output
 
 		LanguageDisplay struct {
-			GoDisplay     string `mapstructure:"go_display"`        // Display name/icon for Go (e.g., "🔵 Go")
-			PythonDisplay string `mapstructure:"python_display"`    // Display name/icon for Python
-			LuaDisplay    string `mapstructure:"lua_display"`       // Display name/icon for Lua
+			GoDisplay         string `mapstructure:"go_display"`         // Display name/icon for Go (e.g., "🔵 Go")
+			PythonDisplay     string `mapstructure:"python_display"`     // Display name/icon for Python
+			LuaDisplay        string `mapstructure:"lua_display"`        // Display name/icon for Lua
 			JavaScriptDisplay string `mapstructure:"javascript_display"` // Display name/icon for JavaScript
 			TypeScriptDisplay string `mapstructure:"typescript_display"` // Display name/icon for TypeScript
-			RustDisplay    string `mapstructure:"rust_display"`     // Display name/icon for Rust
-			CppDisplay     string `mapstructure:"cpp_display"`      // Display name/icon for C++
-			CDisplay       string `mapstructure:"c_display"`        // Display name/icon for C
-			JavaDisplay    string `mapstructure:"java_display"`     // Display name/icon for Java
-			RubyDisplay    string `mapstructure:"ruby_display"`     // Display name/icon for Ruby
-			PHPDisplay     string `mapstructure:"php_display"`      // Display name/icon for PHP
-			HTMLDisplay    string `mapstructure:"html_display"`     // Display name/icon for HTML
-			CSSDisplay     string `mapstructure:"css_display"`      // Display name/icon for CSS
-			ShellDisplay   string `mapstructure:"shell_display"`    // Display name/icon for Shell
-			DefaultDisplay string `mapstructure:"default_display"`  // Display for any unspecified language
+			RustDisplay       string `mapstructure:"rust_display"`       // Display name/icon for Rust
+			CppDisplay        string `mapstructure:"cpp_display"`        // Display name/icon for C++
+			CDisplay          string `mapstructure:"c_display"`          // Display name/icon for C
+			JavaDisplay       string `mapstructure:"java_display"`       // Display name/icon for Java
+			RubyDisplay       string `mapstructure:"ruby_display"`       // Display name/icon for Ruby
+			PHPDisplay        string `mapstructure:"php_display"`        // Display name/icon for PHP
+			HTMLDisplay       string `mapstructure:"html_display"`       // Display name/icon for HTML
+			CSSDisplay        string `mapstructure:"css_display"`        // Display name/icon for CSS
+			ShellDisplay      string `mapstructure:"shell_display"`      // Display name/icon for Shell
+			DefaultDisplay    string `mapstructure:"default_display"`    // Display for any unspecified language
 		} `mapstructure:"language_display"`
 	} `mapstructure:"language_settings"`
-	ShowDividers bool `mapstructure:"show_dividers"`
+	ShowDividers   bool `mapstructure:"show_dividers"`
+	AuthorSettings struct {
+		LookbackDays int `mapstructure:"lookback_days"`
+		MaxTopRepos  int `mapstructure:"max_top_repos"`
+	} `mapstructure:"author_settings"`
 }
 
 type State struct {
 	ActiveProfile string `json:"active_profile"`
-	IsValidated	  bool   `json:"is_validated"`
+	IsValidated   bool   `json:"is_validated"`
 }
 
 var (
@@ -119,6 +123,14 @@ func (c *Config) ValidateConfig() error {
 	}
 	if c.GoalSettings.WeeklyCommitGoal < 0 {
 		return fmt.Errorf("goal_settings.weekly_commit_goal cannot be negative")
+	}
+
+	// Validate author settings
+	if c.AuthorSettings.LookbackDays <= 0 {
+		c.AuthorSettings.LookbackDays = 30 // Default to 30 days
+	}
+	if c.AuthorSettings.MaxTopRepos <= 0 {
+		c.AuthorSettings.MaxTopRepos = 5 // Default to 5 repos
 	}
 
 	// Validate colors (optional - can remove this to allow empty colors)
