@@ -1,8 +1,12 @@
+<div align="center">
+
 # Streakode 🚀
 
 [![Release](https://img.shields.io/github/v/release/AccursedGalaxy/streakode)](https://github.com/AccursedGalaxy/streakode/releases)
 [![Go Report Card](https://goreportcard.com/badge/github.com/AccursedGalaxy/streakode)](https://goreportcard.com/report/github.com/AccursedGalaxy/streakode)
 [![License](https://img.shields.io/github/license/AccursedGalaxy/streakode?color=blue)](https://github.com/AccursedGalaxy/streakode/blob/main/LICENSE.md)
+
+</div>
 
 Streakode is a powerful Git analytics and search tool that combines advanced commit history exploration with insightful coding statistics. Perfect for developers who want to understand their coding patterns, search through their Git history efficiently, and maintain productive coding streaks across multiple repositories.
 
