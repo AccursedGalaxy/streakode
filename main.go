@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -284,34 +283,147 @@ Example:
 	}
 
 	authorCmd := &cobra.Command{
-		Use:   "author",
-		Short: "Show configured Git author information",
-		Run: func(cmd *cobra.Command, args []string) {
-			// Check global git config
-			globalName, _ := exec.Command("git", "config", "--global", "user.name").Output()
-			globalEmail, _ := exec.Command("git", "config", "--global", "user.email").Output()
+		Use:   "author [name]",
+		Short: "Show detailed Git author information and statistics",
+		Long: `Display detailed Git author information and statistics.
 
-			fmt.Println("Global Git Configuration:")
-			fmt.Printf("Name:  %s", string(globalName))
-			fmt.Printf("Email: %s", string(globalEmail))
+Without arguments, shows stats for the configured author.
+With an author name argument, shows stats for the specified author.
 
-			// Check local git config if in a repository
-			if isGitRepo, _ := exec.Command("git", "rev-parse", "--is-inside-work-tree").Output(); len(isGitRepo) > 0 {
-				localName, _ := exec.Command("git", "config", "user.name").Output()
-				localEmail, _ := exec.Command("git", "config", "user.email").Output()
-
-				if len(localName) > 0 || len(localEmail) > 0 {
-					fmt.Println("\nLocal Repository Configuration:")
-					if len(localName) > 0 {
-						fmt.Printf("Name:  %s", string(localName))
-					}
-					if len(localEmail) > 0 {
-						fmt.Printf("Email: %s", string(localEmail))
-					}
-				}
+Example:
+  streakode author             # Show stats for configured author
+  streakode author "John Doe"  # Show stats for John Doe`,
+		Run: func(cobraCmd *cobra.Command, args []string) {
+			var targetAuthor string
+			if len(args) > 0 {
+				targetAuthor = args[0]
 			}
+			cmd.DisplayAuthorInfo(targetAuthor)
 		},
 	}
+
+	// Add history command
+	historyCmd := &cobra.Command{
+		Use:     "history [flags]",
+		Short:   "Interactive Git history search",
+		Long:    `Search and explore your Git commit history interactively.
+
+Uses fuzzy search to quickly find commits across all repositories.
+Press '?' while searching to see keyboard shortcuts.`,
+		Example: `  sk history                  # Show commits from last 7 days
+  sk history --days 30        # Show last 30 days
+  sk history author robin     # Show commits by author
+  sk history repo myproject   # Show commits in repository`,
+		Run:     func(cobraCmd *cobra.Command, args []string) {
+			var opts cmd.HistoryOptions
+			days, _ := cobraCmd.Flags().GetInt("days")
+			format, _ := cobraCmd.Flags().GetString("format")
+			opts.Days = days
+			opts.Format = format
+			if days == 0 {
+				opts.Days = 7
+			}
+			cmd.DisplayHistory(opts)
+		},
+	}
+
+	// Add persistent flags that will be inherited by all subcommands
+	historyCmd.PersistentFlags().IntP("days", "n", 7, "Number of days to show history for")
+	historyCmd.PersistentFlags().StringP("format", "f", "default", "Output format (default, detailed, compact)")
+
+	// Add subcommands with cleaner help text
+	historyAuthorCmd := &cobra.Command{
+		Use:   "author [name]",
+		Short: "Show commits by author",
+		Example: `  sk history author robin     # Show Robin's commits
+  sk history author "John D"  # Show John D's commits`,
+		Args: cobra.ExactArgs(1),
+		Run: func(cobraCmd *cobra.Command, args []string) {
+			var opts cmd.HistoryOptions
+			opts.Author = args[0]
+			days, _ := cobraCmd.PersistentFlags().GetInt("days")
+			format, _ := cobraCmd.PersistentFlags().GetString("format")
+			opts.Days = days
+			opts.Format = format
+			if days == 0 {
+				opts.Days = 14
+			}
+			cmd.DisplayHistory(opts)
+		},
+	}
+
+	historyRepoCmd := &cobra.Command{
+		Use:   "repo [name]",
+		Short: "Show commits in repository",
+		Example: `  sk history repo myproject   # Show commits in myproject
+  sk history repo webapp     # Show commits in webapp`,
+		Args: cobra.ExactArgs(1),
+		Run: func(cobraCmd *cobra.Command, args []string) {
+			var opts cmd.HistoryOptions
+			opts.Repository = args[0]
+			days, _ := cobraCmd.PersistentFlags().GetInt("days")
+			format, _ := cobraCmd.PersistentFlags().GetString("format")
+			opts.Days = days
+			opts.Format = format
+			if days == 0 {
+				opts.Days = 14
+			}
+			cmd.DisplayHistory(opts)
+		},
+	}
+
+	historyRecentCmd := &cobra.Command{
+		Use:   "recent",
+		Short: "Show commits from last 24 hours",
+		Run: func(cobraCmd *cobra.Command, args []string) {
+			var opts cmd.HistoryOptions
+			opts.Days = 1
+			opts.Format = "detailed"
+			cmd.DisplayHistory(opts)
+		},
+	}
+
+	historyFilesCmd := &cobra.Command{
+		Use:   "files [pattern]",
+		Short: "Search commits by changed files",
+		Example: `  sk history files "*.go"     # Show commits changing Go files
+  sk history files config    # Show commits changing config files`,
+		Run: func(cobraCmd *cobra.Command, args []string) {
+			var opts cmd.HistoryOptions
+			opts.Format = "files"
+			if len(args) > 0 {
+				opts.Query = args[0]
+			}
+			days, _ := cobraCmd.PersistentFlags().GetInt("days")
+			opts.Days = days
+			if days == 0 {
+				opts.Days = 7
+			}
+			cmd.DisplayHistory(opts)
+		},
+	}
+
+	historyStatsCmd := &cobra.Command{
+		Use:   "stats",
+		Short: "Show commit statistics",
+		Run: func(cobraCmd *cobra.Command, args []string) {
+			var opts cmd.HistoryOptions
+			opts.Format = "stats"
+			days, _ := cobraCmd.PersistentFlags().GetInt("days")
+			opts.Days = days
+			if days == 0 {
+				opts.Days = 30
+			}
+			cmd.DisplayHistory(opts)
+		},
+	}
+
+	// Add subcommands to history command
+	historyCmd.AddCommand(historyAuthorCmd)
+	historyCmd.AddCommand(historyRepoCmd)
+	historyCmd.AddCommand(historyRecentCmd)
+	historyCmd.AddCommand(historyFilesCmd)
+	historyCmd.AddCommand(historyStatsCmd)
 
 	// Add all commands to root
 	rootCmd.AddCommand(statsCmd)
@@ -319,5 +431,6 @@ Example:
 	rootCmd.AddCommand(profileCmd)
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(authorCmd)
+	rootCmd.AddCommand(historyCmd)
 	rootCmd.Execute()
 }

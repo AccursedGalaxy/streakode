@@ -17,6 +17,7 @@ type CommitHistory struct {
 	Date        time.Time `json:"date"`
 	Hash        string    `json:"hash"`
 	MessageHead string    `json:"message_head"`
+	Author      string    `json:"author"`
 	FileCount   int       `json:"file_count"`
 	Additions   int       `json:"additions"`
 	Deletions   int       `json:"deletions"`
@@ -85,7 +86,7 @@ func IsInDateRange(date time.Time, dateRange DateRange) bool {
 
 // GetCurrentWeekRange returns the date range for the current week (Monday to Sunday)
 func GetCurrentWeekRange() DateRange {
-	now := time.Now()
+	now := time.Now().UTC()
 
 	if config.AppConfig.Debug {
 		fmt.Printf("Debug: Calculating week range\n")
@@ -94,7 +95,7 @@ func GetCurrentWeekRange() DateRange {
 	}
 
 	// Get the start of the current day
-	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 
 	// Calculate days since last Monday
 	daysFromMonday := int(now.Weekday())
@@ -146,29 +147,34 @@ func GetMonthRange(monthsBack int) DateRange {
 func countCommitsInRange(dates []string, dateRange DateRange) int {
 	count := 0
 	uniqueDays := make(map[string]bool)
-	parsedDates := make(map[string]time.Time) // Cache parsed dates
-
-	startYMD := dateRange.Start.Format("2006-01-02")
-	endYMD := dateRange.End.Format("2006-01-02")
 
 	if config.AppConfig.Debug {
-		fmt.Printf("Debug: Counting commits between %s and %s\n", startYMD, endYMD)
+		fmt.Printf("Debug: Counting commits between %s and %s\n",
+			dateRange.Start.Format("2006-01-02"),
+			dateRange.End.Format("2006-01-02"))
 	}
 
 	for _, dateStr := range dates {
-		// Check cache first
-		commitDate, ok := parsedDates[dateStr]
-		if !ok {
-			var err error
-			commitDate, err = time.Parse("2006-01-02 15:04:05 -0700", dateStr)
-			if err != nil {
-				continue
-			}
-			parsedDates[dateStr] = commitDate
+		// Split the date string since it contains multiple fields
+		parts := strings.Split(dateStr, "|")
+		if len(parts) < 1 {
+			continue
 		}
 
+		commitDate, err := time.Parse(time.RFC3339, parts[0])
+		if err != nil {
+			if config.AppConfig.Debug {
+				fmt.Printf("Debug: Failed to parse date %s: %v\n", parts[0], err)
+			}
+			continue
+		}
+
+		// Convert to UTC for consistent comparison
+		commitDate = commitDate.UTC()
 		dayKey := commitDate.Format("2006-01-02")
-		if dayKey >= startYMD && dayKey < endYMD {
+
+		// Check if the commit falls within the date range (inclusive)
+		if !commitDate.Before(dateRange.Start) && commitDate.Before(dateRange.End) {
 			count++
 			uniqueDays[dayKey] = true
 			if config.AppConfig.Debug && count%10 == 0 {
@@ -198,13 +204,13 @@ func countLastWeeksCommits(dates []string) int {
 
 // Refactored version of countRecentCommits using date ranges
 func countRecentCommits(dates []string, days int) int {
-	now := time.Now()
-	startDate := now.AddDate(0, 0, -days+1) // Include today
-	startDate = time.Date(startDate.Year(), startDate.Month(), startDate.Day(), 0, 0, 0, 0, startDate.Location())
+	now := time.Now().UTC()
+	startDate := now.AddDate(0, 0, -days) // Go back 'days' days
+	startDate = time.Date(startDate.Year(), startDate.Month(), startDate.Day(), 0, 0, 0, 0, time.UTC)
 
 	dateRange := DateRange{
 		Start: startDate,
-		End:   now.AddDate(0, 0, 1), // Include commits from today
+		End:   now,
 	}
 
 	if config.AppConfig.Debug {
@@ -251,7 +257,7 @@ func fetchRepoMeta(repoPath, author string) RepoMetadata {
 
 	meta := RepoMetadata{
 		Path:         repoPath,
-		LastAnalyzed: time.Now(),
+		LastAnalyzed: time.Now().UTC(),
 	}
 
 	// Check if directory exists and is accessible
@@ -262,15 +268,16 @@ func fetchRepoMeta(repoPath, author string) RepoMetadata {
 		return meta
 	}
 
-	// Get commit dates in a single git command
-	authorCmd := exec.Command("git", "-C", repoPath, "log", "--all",
-		"--author="+author, "--pretty=format:%ci")
+	// Get commit dates in a single git command using RFC3339 format
+	cmd := exec.Command("git", "-C", repoPath, "log", "--all",
+		"--author="+author,
+		"--pretty=format:%aI|%H|%an|%ae|%s")
 
 	if config.AppConfig.Debug {
-		fmt.Printf("Debug: Running git command: %v\n", authorCmd.String())
+		fmt.Printf("Debug: Running git command: %v\n", cmd.String())
 	}
 
-	output, err := authorCmd.Output()
+	output, err := cmd.Output()
 	if err != nil {
 		if config.AppConfig.Debug {
 			fmt.Printf("Debug: Git command failed: %v\n", err)
@@ -288,14 +295,17 @@ func fetchRepoMeta(repoPath, author string) RepoMetadata {
 		}
 
 		// Parse first date for last commit
-		if lastCommitTime, err := time.Parse("2006-01-02 15:04:05 -0700", dates[0]); err == nil {
-			meta.LastCommit = lastCommitTime
-			meta.Dormant = time.Since(meta.LastCommit) > time.Duration(config.AppConfig.DormantThreshold)*24*time.Hour
+		parts := strings.Split(dates[0], "|")
+		if len(parts) >= 1 {
+			if lastCommitTime, err := time.Parse(time.RFC3339, parts[0]); err == nil {
+				meta.LastCommit = lastCommitTime.UTC()
+				meta.Dormant = time.Since(meta.LastCommit) > time.Duration(config.AppConfig.DormantThreshold)*24*time.Hour
 
-			if config.AppConfig.Debug {
-				fmt.Printf("Debug: Last commit: %s (Dormant: %v)\n",
-					meta.LastCommit.Format("2006-01-02 15:04:05"),
-					meta.Dormant)
+				if config.AppConfig.Debug {
+					fmt.Printf("Debug: Last commit: %s (Dormant: %v)\n",
+						meta.LastCommit.Format("2006-01-02 15:04:05"),
+						meta.Dormant)
+				}
 			}
 		}
 
@@ -373,15 +383,13 @@ func (m *RepoMetadata) updateDetailedStats(repoPath, author string) {
 func fetchDetailedCommitInfo(repoPath string, author string, since time.Time) ([]CommitHistory, error) {
 	var history []CommitHistory
 
-	// Get detailed git log with stats
+	// Get detailed git log with stats using RFC3339 format
 	gitCmd := exec.Command("git", "-C", repoPath, "log",
 		"--all",
 		"--author="+author,
-		"--pretty=format:%H|%aI|%s",
+		"--pretty=format:%aI|%H|%an|%s",
 		"--numstat",
 		"--after="+since.Format("2006-01-02"))
-
-	// fmt.Printf("Debug - Running git command: %v\n", gitCmd.String())
 
 	output, err := gitCmd.Output()
 	if err != nil {
@@ -396,22 +404,31 @@ func fetchDetailedCommitInfo(repoPath string, author string, since time.Time) ([
 		if strings.Contains(line, "|") {
 			// This is a commit header line
 			parts := strings.Split(line, "|")
-			if len(parts) == 3 {
+			if len(parts) == 4 {
 				if currentCommit != nil {
 					history = append(history, *currentCommit)
 				}
 
-				commitTime, _ := time.Parse(time.RFC3339, parts[1])
+				commitTime, err := time.Parse(time.RFC3339, parts[0])
+				if err != nil {
+					continue
+				}
 				currentCommit = &CommitHistory{
-					Hash:        parts[0],
-					Date:        commitTime,
-					MessageHead: parts[2],
+					Hash:        parts[1],
+					Date:        commitTime.UTC(), // Store in UTC for consistency
+					Author:      parts[2],
+					MessageHead: parts[3],
 				}
 			}
 		} else if line != "" && currentCommit != nil {
 			// This is a stats line
 			parts := strings.Fields(line)
 			if len(parts) == 3 {
+				// Handle binary files and renames
+				if parts[0] == "-" || parts[1] == "-" {
+					currentCommit.FileCount++
+					continue
+				}
 				additions, _ := strconv.Atoi(parts[0])
 				deletions, _ := strconv.Atoi(parts[1])
 				currentCommit.Additions += additions
@@ -495,13 +512,24 @@ func calculateStreakInfo(dates []string) StreakInfo {
 		fmt.Printf("Debug: Processing %d commit dates\n", len(dates))
 	}
 
-	// First pass - parse dates and get unique days
+	// First pass - parse dates and get unique days in UTC
 	for _, dateStr := range dates {
-		date, err := time.Parse("2006-01-02 15:04:05 -0700", dateStr)
-		if err != nil {
+		// Split the date string since it contains multiple fields
+		parts := strings.Split(dateStr, "|")
+		if len(parts) < 1 {
 			continue
 		}
 
+		date, err := time.Parse(time.RFC3339, parts[0])
+		if err != nil {
+			if config.AppConfig.Debug {
+				fmt.Printf("Debug: Failed to parse date %s: %v\n", parts[0], err)
+			}
+			continue
+		}
+
+		// Convert to UTC for consistent date comparison
+		date = date.UTC()
 		ymd := date.Format("2006-01-02")
 		if !uniqueDates[ymd] {
 			uniqueDates[ymd] = true
@@ -520,10 +548,10 @@ func calculateStreakInfo(dates []string) StreakInfo {
 	// Calculate current streak
 	currentStreak := 0
 	longestStreak := 0
-	today := time.Now().Format("2006-01-02")
+	today := time.Now().UTC().Format("2006-01-02")
 
 	// Check if there's a commit today
-	if sortedDates[0] == today {
+	if len(sortedDates) > 0 && sortedDates[0] == today {
 		currentStreak = 1
 		longestStreak = 1
 	}
@@ -565,7 +593,13 @@ func calculateStreakInfo(dates []string) StreakInfo {
 func findMostActiveDay(dates []string) string {
 	dayCount := make(map[string]int)
 	for _, dateStr := range dates {
-		commitDate, err := time.Parse("2006-01-02 15:04:05 -0700", dateStr)
+		// Split the date string since it contains multiple fields
+		parts := strings.Split(dateStr, "|")
+		if len(parts) < 1 {
+			continue
+		}
+
+		commitDate, err := time.Parse(time.RFC3339, parts[0])
 		if err != nil {
 			continue
 		}
@@ -926,4 +960,157 @@ func (m *RepoMetadata) ValidateData() ValidationResult {
 	}
 
 	return result
+}
+
+// FetchRepoMetadata - gets metadata for a single repository
+func FetchRepoMetadata(repoPath string) RepoMetadata {
+	if config.AppConfig.Debug {
+		fmt.Printf("\nDebug: Fetching metadata for repo: %s\n", repoPath)
+	}
+
+	meta := RepoMetadata{
+		Path:         repoPath,
+		LastAnalyzed: time.Now(),
+	}
+
+	// Check if directory exists and is accessible
+	if _, err := os.Stat(repoPath); os.IsNotExist(err) {
+		if config.AppConfig.Debug {
+			fmt.Printf("Debug: Directory not found: %s\n", repoPath)
+		}
+		return meta
+	}
+
+	// Get commit dates in a single git command using RFC3339 format
+	cmd := exec.Command("git", "-C", repoPath, "log", "--all",
+		"--pretty=format:%aI|%H|%an|%ae|%s")
+
+	if config.AppConfig.Debug {
+		fmt.Printf("Debug: Running git command: %v\n", cmd.String())
+	}
+
+	output, err := cmd.Output()
+	if err != nil {
+		if config.AppConfig.Debug {
+			fmt.Printf("Debug: Git command failed: %v\n", err)
+		}
+		return meta
+	}
+
+	if len(output) > 0 {
+		commits := strings.Split(string(output), "\n")
+		meta.CommitCount = len(commits)
+
+		if config.AppConfig.Debug {
+			fmt.Printf("Debug: Found %d commits\n", meta.CommitCount)
+		}
+
+		// Process each commit
+		for _, commit := range commits {
+			parts := strings.Split(commit, "|")
+			if len(parts) != 5 {
+				continue
+			}
+
+			commitDate, err := time.Parse(time.RFC3339, parts[0])
+			if err != nil {
+				continue
+			}
+
+			// Convert to UTC for consistency
+			commitDate = commitDate.UTC()
+
+			// Update last commit time
+			if meta.LastCommit.IsZero() || commitDate.After(meta.LastCommit) {
+				meta.LastCommit = commitDate
+			}
+
+			// Create commit history entry
+			history := CommitHistory{
+				Date:        commitDate,
+				Hash:        parts[1],
+				Author:      fmt.Sprintf("%s <%s>", parts[2], parts[3]),
+				MessageHead: parts[4],
+			}
+
+			// Get commit stats
+			stats := getCommitStats(repoPath, parts[1])
+			history.FileCount = stats.FileCount
+			history.Additions = stats.Additions
+			history.Deletions = stats.Deletions
+
+			meta.CommitHistory = append(meta.CommitHistory, history)
+		}
+
+		// Calculate additional stats
+		meta.WeeklyCommits = countRecentCommits(commits, 7)
+		meta.MonthlyCommits = countRecentCommits(commits, 30)
+		meta.LastWeeksCommits = countLastWeeksCommits(commits)
+
+		if config.AppConfig.Debug {
+			fmt.Printf("Debug: Weekly commits: %d\n", meta.WeeklyCommits)
+			fmt.Printf("Debug: Monthly commits: %d\n", meta.MonthlyCommits)
+			fmt.Printf("Debug: Last week's commits: %d\n", meta.LastWeeksCommits)
+		}
+
+		// Calculate streak info
+		streakInfo := calculateStreakInfo(commits)
+		meta.CurrentStreak = streakInfo.Current
+		meta.LongestStreak = streakInfo.Longest
+		meta.MostActiveDay = findMostActiveDay(commits)
+
+		// Get language statistics
+		if languages, err := fetchLanguageStats(repoPath); err == nil {
+			meta.Languages = languages
+			meta.TotalLines = calculateTotalLines(languages)
+		}
+	}
+
+	return meta
+}
+
+type commitStats struct {
+	FileCount int
+	Additions int
+	Deletions int
+}
+
+func getCommitStats(repoPath, hash string) commitStats {
+	var stats commitStats
+	cmd := exec.Command("git", "-C", repoPath, "show", "--numstat", "--format=", hash)
+	output, err := cmd.Output()
+	if err != nil {
+		return stats
+	}
+
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		parts := strings.Fields(line)
+		if len(parts) != 3 {
+			continue
+		}
+		// Handle binary files and renames
+		if parts[0] == "-" || parts[1] == "-" {
+			stats.FileCount++
+			continue
+		}
+		add, _ := strconv.Atoi(parts[0])
+		del, _ := strconv.Atoi(parts[1])
+		stats.Additions += add
+		stats.Deletions += del
+		stats.FileCount++
+	}
+
+	return stats
+}
+
+func calculateTotalLines(languages map[string]int) int {
+	total := 0
+	for _, lines := range languages {
+		total += lines
+	}
+	return total
 }

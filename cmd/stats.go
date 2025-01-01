@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/AccursedGalaxy/streakode/cache"
@@ -52,52 +53,187 @@ func (c *DefaultStatsCalculator) CalculateCommitTrend(current int, previous int)
 
 // DisplayStats - Displays stats for all active repositories or a specific repository
 func DisplayStats(targetRepo string) {
-	// Get table width from the rendered table first
-	projectsSection := buildProjectsSection(targetRepo)
-	tableLines := strings.Split(projectsSection, "\n")
-	if len(tableLines) == 0 {
+	// Get pre-calculated display stats from cache
+	displayStats := cache.Cache.GetDisplayStats()
+	if displayStats == nil {
+		fmt.Println("No stats available. Try running 'cache reload' first.")
 		return
 	}
 
-	// Get the actual table width from the first line (including borders)
-	tableWidth := len([]rune(tableLines[0])) // use runes to handle Unicode characters correctly
+	// Filter repo stats if target repo is specified
+	var repoStats []cache.RepoDisplayStats
+	if targetRepo != "" {
+		for _, rs := range displayStats.RepoStats {
+			if rs.Name == targetRepo {
+				repoStats = append(repoStats, rs)
+				break
+			}
+		}
+		if len(repoStats) == 0 {
+			fmt.Printf("Repository '%s' not found.\n", targetRepo)
+			return
+		}
+	} else {
+		repoStats = displayStats.RepoStats
+	}
 
-	// Create styles with calculated width - match table width exactly
-	style := lipgloss.NewStyle()
-	headerStyle := style.
-		Bold(true).
-		Foreground(lipgloss.Color(config.AppConfig.Colors.HeaderColor)).
-		Width(tableWidth).
-		Align(lipgloss.Center)
+	// Calculate table width
+	tableWidth := calculator.CalculateTableWidth()
 
-	// Build sections dynamically
+	// Build projects table first to get actual width
+	var tableOutput string
+	if len(repoStats) > 0 {
+		t := table.NewWriter()
+
+		// Configure table column widths
+		t.SetColumnConfigs([]table.ColumnConfig{
+			{Number: 1, WidthMax: int(float64(tableWidth) * 0.35)}, // Repository name
+			{Number: 2, WidthMax: int(float64(tableWidth) * 0.15)}, // Weekly commits
+			{Number: 3, WidthMax: int(float64(tableWidth) * 0.15)}, // Streak
+			{Number: 4, WidthMax: int(float64(tableWidth) * 0.20)}, // Changes
+			{Number: 5, WidthMax: int(float64(tableWidth) * 0.15)}, // Last activity
+		})
+
+		// Set overall table width
+		t.SetAllowedRowLength(tableWidth)
+
+		// Add Table Header if Set in config
+		if config.AppConfig.DisplayStats.TableStyle.UseTableHeader {
+			t.AppendHeader(table.Row{
+				"Repo",
+				"Weekly",
+				"Streak",
+				"Changes",
+				"Activity",
+			})
+		}
+
+		// Apply table style based on config
+		var style table.Style
+		switch strings.ToLower(config.AppConfig.DisplayStats.TableStyle.Style) {
+		case "rounded":
+			style = table.StyleRounded
+		case "bold":
+			style = table.StyleBold
+		case "light":
+			style = table.StyleLight
+		case "double":
+			style = table.StyleDouble
+		default:
+			style = table.StyleDefault
+		}
+
+		// Customize style based on config options
+		style.Options.DrawBorder = config.AppConfig.DisplayStats.TableStyle.Options.DrawBorder
+		style.Options.SeparateColumns = config.AppConfig.DisplayStats.TableStyle.Options.SeparateColumns
+		style.Options.SeparateHeader = config.AppConfig.DisplayStats.TableStyle.Options.SeparateHeader
+		style.Options.SeparateRows = config.AppConfig.DisplayStats.TableStyle.Options.SeparateRows
+
+		t.SetStyle(style)
+
+		// Add rows
+		for _, rs := range repoStats {
+			activityText := formatActivityText(rs.LastCommitTime)
+			t.AppendRow(table.Row{
+				rs.Name,
+				fmt.Sprintf("%d%s", rs.WeeklyCommits, formatActivityIndicator(rs.WeeklyCommits)),
+				formatStreakString(rs.CurrentStreak, rs.LongestStreak),
+				fmt.Sprintf("+%d/-%d", rs.Additions, rs.Deletions),
+				activityText,
+			})
+		}
+		tableOutput = t.Render()
+	}
+
+	// Get actual table width from first line
+	var actualWidth int
+	if tableOutput != "" {
+		lines := strings.Split(tableOutput, "\n")
+		if len(lines) > 0 {
+			actualWidth = len([]rune(lines[0])) // Use runes to handle Unicode characters correctly
+		}
+	} else {
+		actualWidth = tableWidth
+	}
+
+	// Build header with actual table width
 	var sections []string
-
-	// Header section
 	if config.AppConfig.DisplayStats.ShowWelcomeMessage {
 		headerText := fmt.Sprintf("🚀 %s's Coding Activity", config.AppConfig.Author)
 		if targetRepo != "" {
 			headerText = fmt.Sprintf("🚀 %s's Activity in %s", config.AppConfig.Author, targetRepo)
 		}
-		padding := (tableWidth - len([]rune(headerText))) / 2
-		centeredHeader := fmt.Sprintf("%*s%s%*s", padding, "", headerText, padding, "")
-		sections = append(sections, headerStyle.Render(centeredHeader))
+
+		// Calculate padding manually for perfect centering
+		textWidth := len([]rune(headerText))
+		leftPadding := (actualWidth - textWidth) / 2
+		rightPadding := actualWidth - textWidth - leftPadding
+
+		// Build centered header with exact padding
+		centeredHeader := fmt.Sprintf("%s%s%s",
+			strings.Repeat(" ", leftPadding),
+			headerText,
+			strings.Repeat(" ", rightPadding))
+
+		style := lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color(config.AppConfig.Colors.HeaderColor))
+
+		sections = append(sections, style.Render(centeredHeader))
 	}
 
-	// Active projects section (table)
-	if config.AppConfig.DisplayStats.ShowActiveProjects && projectsSection != "" {
-		sections = append(sections, projectsSection)
+	// Add table to sections
+	if tableOutput != "" {
+		sections = append(sections, tableOutput)
 	}
 
-	// Insights section
+	// Build insights section
 	if config.AppConfig.DisplayStats.ShowInsights {
-		insights := buildInsightsSection(targetRepo)
-		if insights != "" {
-			sections = append(sections, insights)
+		t := table.NewWriter()
+		t.SetStyle(getTableStyle())
+		t.SetAllowedRowLength(tableWidth - 2)
+
+		// Weekly summary
+		trend := "↗️"
+		if displayStats.WeeklyDiff < 0 {
+			trend = "↘️"
 		}
+		weeklyText := fmt.Sprintf("📈 Weekly Summary: %d commits (%s %s), +%d/-%d lines",
+			displayStats.WeeklyTotal,
+			trend,
+			formatDiff(displayStats.WeeklyDiff),
+			displayStats.TotalAdditions,
+			displayStats.TotalDeletions)
+		sections = append(sections, weeklyText)
+
+		// Daily average
+		dailyText := fmt.Sprintf("📊 Daily Average:  %.1f commits", displayStats.DailyAverage)
+		sections = append(sections, dailyText)
+
+		// Language stats
+		if len(displayStats.LanguageStats) > 0 {
+			langText := "💻 Top Languages:  " + formatLanguageStats(displayStats.LanguageStats)
+			sections = append(sections, langText)
+		}
+
+		// Peak coding hour
+		peakText := fmt.Sprintf("⏰ Peak Coding:    %02d:00-%02d:00 (%d commits)",
+			displayStats.PeakHour,
+			(displayStats.PeakHour+1)%24,
+			displayStats.PeakCommits)
+		sections = append(sections, peakText)
+
+		// Weekly goal (hardcoded for now, can be made configurable later)
+		const weeklyGoal = 200 // commits per week
+		progress := float64(displayStats.WeeklyTotal) / float64(weeklyGoal) * 100
+		goalText := fmt.Sprintf("🎯 Weekly Goal:    %d%% (%d/%d commits)",
+			int(progress),
+			displayStats.WeeklyTotal,
+			weeklyGoal)
+		sections = append(sections, goalText)
 	}
 
-	// Join sections with dividers only if configured
+	// Join sections
 	output := ""
 	if config.AppConfig.ShowDividers {
 		divider := strings.Repeat("─", tableWidth)
@@ -111,7 +247,6 @@ func DisplayStats(targetRepo string) {
 			output += strings.TrimSpace(section)
 		}
 	} else {
-		// Join sections directly without dividers
 		for _, section := range sections {
 			if section != "" {
 				if output != "" {
@@ -125,6 +260,73 @@ func DisplayStats(targetRepo string) {
 	fmt.Println(output)
 }
 
+func formatDiff(diff int) string {
+	if diff < 0 {
+		return fmt.Sprintf("down %d", -diff)
+	}
+	return fmt.Sprintf("up %d", diff)
+}
+
+func formatLanguageStats(stats map[string]int) string {
+	type langStat struct {
+		name  string
+		lines int
+	}
+	var sorted []langStat
+	for lang, lines := range stats {
+		sorted = append(sorted, langStat{lang, lines})
+	}
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].lines > sorted[j].lines
+	})
+
+	var result []string
+	for i, ls := range sorted {
+		if i >= 3 {
+			break
+		}
+		icon := getLanguageIcon(ls.name)
+		result = append(result, fmt.Sprintf("%s %s (%.1fK)", icon, ls.name, float64(ls.lines)/1000))
+	}
+	return strings.Join(result, "  ")
+}
+
+func getLanguageIcon(lang string) string {
+	icons := map[string]string{
+		"Go":         "🔵",
+		"Java":       "☕",
+		"Python":     "🐍",
+		"JavaScript": "💛",
+		"TypeScript": "💙",
+		"Rust":       "🦀",
+		"C++":        "⚡",
+		"C":          "⚡",
+		"Ruby":       "💎",
+		"Shell":      "🐚",
+		"File":       "📄",
+	}
+	if icon, ok := icons[lang]; ok {
+		return icon
+	}
+	return "📄"
+}
+
+func formatActivityText(lastCommit time.Time) string {
+	duration := time.Since(lastCommit)
+	switch {
+	case duration < 24*time.Hour:
+		return "today"
+	case duration < 48*time.Hour:
+		return "1d ago"
+	case duration < 72*time.Hour:
+		return "2d ago"
+	case duration < 96*time.Hour:
+		return "3d ago"
+	default:
+		return fmt.Sprintf("%dd ago", int(duration.Hours()/24))
+	}
+}
+
 func (c *DefaultStatsCalculator) CalculateTableWidth() int {
 	width, _, err := term.GetSize(0)
 	if err != nil {
@@ -135,17 +337,46 @@ func (c *DefaultStatsCalculator) CalculateTableWidth() int {
 
 // prepareRepoData converts the cache map into a sorted slice of repository information
 func prepareRepoData() []repoInfo {
-	repos := make([]repoInfo, 0, len(cache.Cache))
-	for path, repo := range cache.Cache {
-		repoName := path[strings.LastIndex(path, "/")+1:]
-		repos = append(repos, repoInfo{
-			name:       repoName,
-			metadata:   repo,
-			lastCommit: repo.LastCommit,
+	// Pre-allocate slice with capacity
+	repos := make([]repoInfo, 0, cache.Cache.Len())
+
+	// Use parallel processing for large datasets
+	if cache.Cache.Len() > 10 {
+		var mu sync.Mutex
+		var wg sync.WaitGroup
+
+		cache.Cache.Range(func(path string, repo scan.RepoMetadata) bool {
+			wg.Add(1)
+			go func(p string, r scan.RepoMetadata) {
+				defer wg.Done()
+				repoName := p[strings.LastIndex(p, "/")+1:]
+				info := repoInfo{
+					name:       repoName,
+					metadata:   r,
+					lastCommit: r.LastCommit,
+				}
+				mu.Lock()
+				repos = append(repos, info)
+				mu.Unlock()
+			}(path, repo)
+			return true
+		})
+
+		wg.Wait()
+	} else {
+		// Sequential processing for small datasets
+		cache.Cache.Range(func(path string, repo scan.RepoMetadata) bool {
+			repoName := path[strings.LastIndex(path, "/")+1:]
+			repos = append(repos, repoInfo{
+				name:       repoName,
+				metadata:   repo,
+				lastCommit: repo.LastCommit,
+			})
+			return true
 		})
 	}
 
-	// Sort by most recent activity
+	// Sort by most recent activity using direct index access
 	sort.Slice(repos, func(i, j int) bool {
 		return repos[i].lastCommit.After(repos[j].lastCommit)
 	})
@@ -542,21 +773,24 @@ func buildInsightsSection(targetRepo string) string {
 	tableWidth := calculator.CalculateTableWidth()
 	insights := config.AppConfig.DisplayStats.InsightSettings
 
-	// Filter cache for target repository if specified
-	var repoCache map[string]scan.RepoMetadata
-	repoCache = cache.Cache
+	// Use pre-calculated stats from cache when possible
+	var repoCache = make(map[string]scan.RepoMetadata)
 	if targetRepo != "" {
-		filteredCache := make(map[string]scan.RepoMetadata)
-		for path, repo := range cache.Cache {
+		cache.Cache.Range(func(path string, repo scan.RepoMetadata) bool {
 			if strings.HasSuffix(path, "/"+targetRepo) {
-				filteredCache[path] = repo
-				break
+				repoCache[path] = repo
+				return false
 			}
-		}
-		if len(filteredCache) == 0 {
+			return true
+		})
+		if len(repoCache) == 0 {
 			return ""
 		}
-		repoCache = filteredCache
+	} else {
+		cache.Cache.Range(func(path string, repo scan.RepoMetadata) bool {
+			repoCache[path] = repo
+			return true
+		})
 	}
 
 	if config.AppConfig.DetailedStats {
@@ -564,11 +798,51 @@ func buildInsightsSection(targetRepo string) string {
 		t.SetStyle(getTableStyle())
 		t.SetAllowedRowLength(tableWidth - 2)
 
-		// Calculate all stats
-		weeklyCommits, lastWeeksCommits, _, additions, deletions, hourStats := calculateGlobalStats(repoCache)
+		// Use cached stats when available
+		weeklyCommits := 0
+		lastWeeksCommits := 0
+		additions := 0
+		deletions := 0
+		hourStats := make(map[int]int)
+		languageStats := make(map[string]int)
+
+		for _, repo := range repoCache {
+			weeklyCommits += repo.WeeklyCommits
+			lastWeeksCommits += repo.LastWeeksCommits
+
+			// Process language stats in parallel for large repos
+			if len(repo.Languages) > 10 {
+				var wg sync.WaitGroup
+				var mu sync.Mutex
+
+				for lang, lines := range repo.Languages {
+					wg.Add(1)
+					go func(l string, count int) {
+						defer wg.Done()
+						mu.Lock()
+						languageStats[l] += count
+						mu.Unlock()
+					}(lang, lines)
+				}
+
+				wg.Wait()
+			} else {
+				for lang, lines := range repo.Languages {
+					languageStats[lang] += lines
+				}
+			}
+
+			// Use pre-calculated commit stats
+			for _, commit := range repo.CommitHistory {
+				additions += commit.Additions
+				deletions += commit.Deletions
+				hour := commit.Date.Hour()
+				hourStats[hour]++
+			}
+		}
+
 		peakHour, peakCommits := findPeakCodingHour(hourStats)
 		commitTrend := calculator.CalculateCommitTrend(weeklyCommits, lastWeeksCommits)
-		languageStats := calculator.ProcessLanguageStats(repoCache)
 
 		// Append rows based on configuration
 		appendInsightRows(t, insights, insightStats{
