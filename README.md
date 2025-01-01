@@ -4,11 +4,41 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/AccursedGalaxy/streakode)](https://goreportcard.com/report/github.com/AccursedGalaxy/streakode)
 [![License](https://img.shields.io/github/license/AccursedGalaxy/streakode?color=blue)](https://github.com/AccursedGalaxy/streakode/blob/main/LICENSE.md)
 
-Streakode is a powerful Git activity tracker that helps developers monitor their coding streaks, commit patterns, and project engagement. It provides insightful statistics about your coding habits across multiple repositories, with support for different profiles (e.g., work and personal projects).
+Streakode is a powerful Git analytics and search tool that combines advanced commit history exploration with insightful coding statistics. Perfect for developers who want to understand their coding patterns, search through their Git history efficiently, and maintain productive coding streaks across multiple repositories.
 
 <div align="center">
   <img src="images/preview.png" alt="Streakode Preview" width="600">
 </div>
+
+## Key Features ✨
+
+### 🔍 Advanced Git History Search
+- Lightning-fast commit history search powered by `fzf` and `ripgrep`
+- Interactive fuzzy search with real-time preview
+- Rich commit details including diffs, stats, and branch information
+- Smart repository detection and automatic GitHub links
+- Efficient caching system for quick subsequent searches
+
+### 📊 Comprehensive Analytics
+- Detailed commit patterns and coding streaks
+- Code changes tracking (+/-) per repository
+- Language statistics and peak coding hours
+- Project engagement metrics
+- Weekly and monthly activity summaries
+
+### 🎯 Developer Productivity Tools
+- Weekly commit goals and progress tracking
+- Multiple profile support (work/personal separation)
+- Customizable activity indicators
+- Smart caching for fast repository scanning
+- Selective cache updates and version-aware management
+
+### 🎨 Customizable Experience
+- Modern, colorful terminal UI
+- Configurable table layouts and themes
+- Multiple insight views
+- Flexible display options
+- Profile-specific configurations
 
 ## Features ✨
 
@@ -36,8 +66,11 @@ Streakode is a powerful Git activity tracker that helps developers monitor their
 
 ## Installation 🛠️
 
-Proper Installation Flow Coming Soon.
--> Including automatic config file creation and more.
+### Prerequisites
+- Go 1.19 or higher
+- Git
+- [fzf](https://github.com/junegunn/fzf) (required for interactive search)
+- [ripgrep](https://github.com/BurntSushi/ripgrep) (optional, enhances search capabilities)
 
 ### From Releases
 
@@ -51,148 +84,82 @@ cd streakode
 make install
 ```
 
-## Configuration 📝
-
-Create a configuration file at `~/.streakodeconfig.yaml`:
-
-```yaml
-author: "AccursedGalaxy"
-dormant_threshold: 31  # days
-scan_directories:
-  - "~/github"
-scan_settings:
-  excluded_patterns:
-    - "node_modules"
-    - "dist"
-    - ".git"
-    - "vendor"
-    - "build"
-    - ".cache"
-  excluded_paths:
-    - "/home/user/Downloads/"
-refresh_interval: 60   # Minutes
-
-display_stats:
-  show_welcome_message: true
-  show_active_projects: true
-  show_insights: true
-  max_projects: 10
-
-  table_style:
-    use_table_header: true
-    style: "rounded" # default, rounded, bold, light, double
-    options:
-      draw_border: true
-      separate_columns: true # doesnt work :(
-      separate_header: true
-      separate_rows: false
-
-  activity_indicators:
-    high_activity: "🚀"
-    normal_activity: "✨"
-    no_activity: "🌑"
-    streak_record: "🏅"
-    active_streak: "🔥"
-
-  thresholds:
-    high_activity: 10
-
-  insight_settings:
-    top_languages_count: 3
-    show_daily_average: true
-    show_top_languages: true
-    show_peak_coding: true
-    show_weekly_summary: true
-    show_weekly_goal: true
-    show_most_active: false # not showing when detailed stats is true (could remove)
-
-goal_settings:
-  weekly_commit_goal: 50
-
-colors:
-  header_color: "#FF69B4"
-
-detailed_stats: true
-
-language_settings:
-  excluded_extensions:
-    - ".md"
-    - ".txt"
-    - ".yaml"
-    - ".json"
-  excluded_languages:
-    - "Markdown"
-    - "Text"
-    - "YAML"
-    - "JSON"
-  minimum_lines: 100
-  language_display:
-    go_display: "🔵 Go"
-    python_display: "🐍 Python"
-    lua_display: "🌙 Lua"
-    javascript_display: "💛 JavaScript"
-    typescript_display: "🔷 TypeScript"
-    rust_display: "🦀 Rust"
-    cpp_display: "💥 C++"
-    c_display: "🌟 C"
-    java_display: "☕ Java"
-    ruby_display: "💎 Ruby"
-    php_display: "🐘 PHP"
-    html_display: "🌐 HTML"
-    css_display: "🎨 CSS"
-    shell_display: "🐚 Shell"
-    default_display: "📄 File"  # Fallback icon for unspecified languages
-
-show_dividers: false
-```
-
 ## Usage 💻
 
 ### Basic Commands
 
 ```bash
-# Show version
-streakode --version
+# Show version information
 streakode version
 
-# Check your Git author configuration
+# View Git author configuration
 streakode author
 
-# Show statistics for all repositories
-streakode stats
+# Display repository statistics
+streakode stats [repository]
 
-# Show statistics for a specific repository
-streakode stats myproject
+# Interactive commit history search
+streakode history search
 
-# Show statistics with debug output
-streakode stats --debug
-# or
-streakode stats -d
+# Advanced commit search with filters
+streakode history search --author="name" --since="2 weeks ago"
 
-# Refresh repository cache
-streakode cache reload
+# Repository cache management
+streakode cache reload  # Refresh cache
+streakode cache clean   # Clear cache
 
-# Clear repository cache
-streakode cache clean
-
-# Switch profiles
+# Profile management
 streakode profile work    # Switch to work profile
 streakode profile home    # Switch to home profile
-streakode profile default # Switch to default profile
 ```
+
+### Interactive Search Features
+
+The `history search` command provides powerful interactive search capabilities:
+- Fuzzy search through commit history
+- Real-time commit preview with diff
+- Branch information and GitHub links
+- File change statistics
+- Multiple selection support
+- Advanced filtering options
 
 ### Debug Mode
 
-You can enable debug mode for any command by adding the `--debug` or `-d` flag. This will show additional information about:
-- Date ranges being used for calculations
-- Configuration file being used
-- Cache operations
-- And other helpful debugging information
-
-Example:
+Enable debug mode with `--debug` or `-d` flag for any command:
 ```bash
+streakode history search --debug
 streakode stats --debug
-streakode cache reload -d
+```
+
+This shows additional information about:
+- Search parameters and filters
+- Cache operations
+- Configuration details
+- Performance metrics
+
+## Configuration 📝
+
+Create a configuration file at `~/.streakodeconfig.yaml`. See the [example configuration](.defaultconfig.yaml) for all available options.
+
+Key configuration sections:
+```yaml
+# Author and scanning settings
+author: "YourName"
+scan_directories:
+  - "~/github"
+  - "~/work/repos"
+
+# Search and display settings
+search_settings:
+  max_results: 1000
+  cache_timeout: 3600
+  use_fuzzy_search: true
+
+# UI customization
+display_settings:
+  theme: "modern"
+  color_scheme: "dark"
+  show_previews: true
 ```
 
 ## Updating 🔄
@@ -234,30 +201,64 @@ Remove-Item "$env:USERPROFILE\.streakode.state"
 
 Note: If you installed Streakode from a release binary instead of `go install`, simply delete the binary and the configuration files as shown above.
 
-## Contributing 🤝
+## Development 🛠️
 
-Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-### Development Setup
+### Setting Up Development Environment
 
 ```bash
 # Clone the repository
 git clone https://github.com/AccursedGalaxy/streakode.git
+cd streakode
 
-# Install dependencies
-go mod download
+# Install development dependencies
+make dev-deps
 
-# Build and install locally
+# Run tests
+make test
+
+# Build for development
 make dev
 ```
 
----
+### Project Structure
+
+```
+streakode/
+├── cmd/          # Command implementations
+├── cache/        # Caching system
+├── config/       # Configuration management
+├── scan/         # Repository scanning
+└── search/       # Search functionality
+```
+
+### Contributing 🤝
+
+Contributions are welcome! Here's how you can help:
+
+1. Fork the repository
+2. Create your feature branch: `git checkout -b feature/amazing-feature`
+3. Commit your changes: `git commit -m 'Add amazing feature'`
+4. Push to the branch: `git push origin feature/amazing-feature`
+5. Open a Pull Request
+
+Please read our [Contributing Guidelines](CONTRIBUTING.md) for details on our code of conduct and development process.
+
+## Roadmap 🗺️
+
+- [ ] Enhanced search capabilities with advanced filters
+- [ ] Team analytics and collaboration features
+- [ ] Integration with CI/CD platforms
+- [ ] Machine learning-based commit pattern analysis
+- [ ] Custom plugin system
+- [ ] Web interface (planned)
+
+## Support 💖
+
+If you find Streakode helpful:
+- Give it a ⭐ on GitHub
+- Share it with your network
+- [Report issues](https://github.com/AccursedGalaxy/streakode/issues) or contribute
+- Follow the project for updates
 
 ## License 📄
 
@@ -265,16 +266,18 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Acknowledgments 🙏
 
-- Thanks to all contributors who have helped shape Streakode
-- Built with [Cobra](https://github.com/spf13/cobra) and [Viper](https://github.com/spf13/viper)
+Built with:
+- [Cobra](https://github.com/spf13/cobra) - CLI framework
+- [Viper](https://github.com/spf13/viper) - Configuration management
+- [fzf](https://github.com/junegunn/fzf) - Fuzzy finder
+- [ripgrep](https://github.com/BurntSushi/ripgrep) - Fast search
 
-## Support 💖
-
-If you find Streakode helpful, please consider:
-- Giving it a ⭐ on GitHub
-- Sharing it with others
-- [Reporting issues](https://github.com/AccursedGalaxy/streakode/issues) if you find any bugs
+Special thanks to all contributors who have helped shape Streakode into what it is today.
 
 ---
 
-Made with ❤️ by [AccursedGalaxy](https://github.com/AccursedGalaxy)
+<div align="center">
+  Made with ❤️ by <a href="https://github.com/AccursedGalaxy">AccursedGalaxy</a>
+  <br>
+  <sub>A powerful tool for developers who care about their Git history</sub>
+</div>
