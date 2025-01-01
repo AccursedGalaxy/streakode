@@ -1,0 +1,161 @@
+# Streakode Default Configuration
+# -------------------------
+# This is the default configuration file for Streakode.
+# To use this configuration:
+#   1. Copy to ~/.streakodeconfig.yaml for default profile
+#   2. Copy to ~/.streakodeconfig_<profile>.yaml for specific profiles
+#      Examples: ~/.streakodeconfig_work.yaml, ~/.streakodeconfig_home.yaml
+#
+# Profile Usage:
+#   - Run with specific profile: streakode --profile work
+#   - Set default profile: streakode profile work
+#   - Show current profile: streakode profile
+#   - Switch profiles: streakode profile home
+#
+# Note: Each profile maintains its own independent configuration,
+# allowing you to have different settings for different contexts
+# (e.g., work vs personal projects).
+
+# Your Git author name or email to track
+# This should match your Git configuration for the profile
+author: "your-git-author"
+
+# Number of days without activity before a project is considered dormant
+dormant_threshold: 14
+
+# Directories to scan for git repositories
+# Customize these paths based on your profile's context
+# Examples:
+#   Work profile:  ["/work/projects/", "~/work/"]
+#   Home profile:  ["~/github/", "~/personal/"]
+scan_directories:
+  - "~/github/"    # Default GitHub projects directory
+  - "~/projects/"  # Additional projects directory
+
+# Scan settings control what files and directories are included/excluded
+scan_settings:
+  # Patterns to exclude from scanning (glob patterns)
+  excluded_patterns:
+    - "node_modules"
+    - "dist"
+    - ".git"
+    - "vendor"
+    - "build"
+    - ".cache"
+    - "target"      # Rust build directory
+    - "__pycache__" # Python cache
+    - "*.pyc"       # Python compiled files
+    - "bin"         # Binary directories
+    - "obj"         # Object files
+    
+  # Full paths to exclude from scanning
+  # Customize these based on your profile
+  excluded_paths:
+    - "~/Downloads/"
+    - "~/tmp/"
+
+# How often to refresh data (in minutes)
+refresh_interval: 60
+
+# Display settings control how information is presented
+display_stats:
+  show_welcome_message: true      # Show welcome message on startup
+  show_active_projects: true      # Display active projects
+  show_insights: true            # Show coding insights
+  max_projects: 10               # Maximum number of projects to display
+
+  # Table styling options
+  table_style:
+    use_table_header: true
+    style: "rounded"             # Options: rounded, sharp, minimal
+    options:
+      draw_border: true
+      separate_columns: true
+      separate_header: true
+      separate_rows: false
+
+  # Activity indicator emojis
+  activity_indicators:
+    high_activity: "🚀"         # High activity indicator
+    normal_activity: "✨"        # Normal activity
+    no_activity: "🌑"           # No activity
+    streak_record: "🏅"         # Streak record achieved
+    active_streak: "🔥"         # Active streak
+
+  # Activity thresholds
+  thresholds:
+    high_activity: 10           # Number of commits for high activity
+
+  # Insight display settings
+  insight_settings:
+    top_languages_count: 3      # Number of top languages to display
+    show_daily_average: true    # Show daily commit average
+    show_top_languages: true    # Display top programming languages
+    show_peak_coding: true      # Show peak coding times
+    show_weekly_summary: true   # Display weekly activity summary
+    show_weekly_goal: true      # Show progress towards weekly goals
+    show_most_active: true      # Show most active projects
+
+# Weekly coding goals (adjust based on profile context)
+goal_settings:
+  weekly_commit_goal: 15        # Target number of commits per week
+
+# UI color settings
+colors:
+  header_color: "#4A90E2"       # Header color in hex format
+
+# Enable detailed statistics
+detailed_stats: true
+
+# Language-specific settings
+language_settings:
+  # File extensions to exclude from language statistics
+  excluded_extensions:
+    - ".md"
+    - ".txt"
+    - ".yaml"
+    - ".json"
+    - ".lock"
+    - ".log"
+    - ".env"
+    - ".gitignore"
+
+  # Languages to exclude from statistics
+  excluded_languages:
+    - "Markdown"
+    - "Text"
+    - "YAML"
+    - "JSON"
+
+  # Minimum lines of code for a language to be counted
+  minimum_lines: 50
+
+  # Custom language display names/icons
+  language_display:
+    go_display: "🔵 Go"
+    python_display: "🐍 Python"
+    lua_display: "🌙 Lua"
+    javascript_display: "💛 JavaScript"
+    typescript_display: "🔷 TypeScript"
+    rust_display: "🦀 Rust"
+    cpp_display: "💥 C++"
+    c_display: "🌟 C"
+    java_display: "☕ Java"
+    ruby_display: "💎 Ruby"
+    php_display: "🐘 PHP"
+    html_display: "🌐 HTML"
+    css_display: "🎨 CSS"
+    shell_display: "🐚 Shell"
+    default_display: "📄 File"
+
+# Show dividers between sections
+show_dividers: false
+
+# Author-specific settings
+author_settings:
+  lookback_days: 30            # Number of days to look back for statistics
+  max_top_repos: 5             # Maximum number of top repositories to display
+
+# Enable debug mode for verbose logging
+# Can also be enabled via --debug flag
+debug: false 
