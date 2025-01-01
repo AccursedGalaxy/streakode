@@ -317,48 +317,14 @@ Example:
 	historyCmd := &cobra.Command{
 		Use:   "history [command]",
 		Short: "Interactive Git history search and exploration",
-		Long: `Interactive Git history search and exploration with powerful filtering and viewing options.
+		Long: `Interactive Git history search with fuzzy filtering (requires fzf).
 
-This command provides a fast, interactive interface to explore your Git history across all repositories.
-It uses fuzzy finding (fzf) for instant searching through commits, with results loading progressively
-as they become available.
-
-Key Features:
-- Instant interactive fuzzy search through commit history
-- Progressive loading of results for immediate responsiveness
-- Rich commit preview with diff and stats
-- Filter by repository, author, or time range
-- Multiple view formats and sorting options
-- Smart caching for faster subsequent searches
-- Keyboard shortcuts for efficient navigation
-
-Navigation:
-- Type to filter commits instantly
-- Ctrl-a: Toggle select all commits
-- Ctrl-d/u: Page down/up
-- Ctrl-/: Toggle preview panel
-- Enter: Select commit(s)
-- Esc: Exit search`,
-		Example: `  # Interactive search through all commits (last 7 days)
-  streakode history
-
-  # Search commits from a specific author
-  streakode history -a "Your Name"
-
-  # Search in a specific repository
-  streakode history repo myrepo
-
-  # View recent activity (last 24 hours)
-  streakode history recent
-
-  # Search through file changes
-  streakode history files
-
-  # View commit activity stats
-  streakode history stats
-
-  # Show detailed history for the last 30 days
-  streakode history --days 30 --format detailed`,
+Without arguments, shows commits from the last 7 days.
+With subcommands, allows filtering by repository, time range, or specific changes.`,
+		Example: `  streakode history               # Show all recent commits
+  streakode history -a "Name"     # Filter by author
+  streakode history repo myrepo   # Search in repository
+  streakode history recent        # Last 24h activity`,
 		Run: func(cobraCmd *cobra.Command, args []string) {
 			var opts cmd.HistoryOptions
 
