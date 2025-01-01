@@ -1,13 +1,9 @@
 # Stuff I Gotta Do Ya Know
 
-
-## Fixes
-- [X] When there is a directory listed to scan, but it doesn't exist, there is a error and no output is generated.
-  -> I should add a check to see if the directory exists before trying to scan it.
-  -> And just warn the user that the directory doesn't exist or is not accessible.
-
-## Improvements
-- [ ] Implement some sort of check for this:
-  -> Before just loading data from cache, check if there is a new directory setup in the config/or a directory where we do not have any data.
-  -> If there is none just move on to laod from cache and display output normall.
-    -> If there is a new directory or a directory where we do not have any data for, then fetch data and update cache.
+## History command set stuff
+- [ ] Verfiy functionality of `history` command
+    -> All custom filters and commands need to be applied and tested correctly
+    -> Make sure -n --days flag is correctly filtering and fetching the correct amount of days
+    -> Make sure file search is behaving how I would like it to. i.e.: grep search within files like a nvim search using fzf and rg
+    -> Remove "history stats" search command - it's useless
+    - [ ] Test all of the above and make sure it's working correctly
