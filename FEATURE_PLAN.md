@@ -1,171 +1,138 @@
 # Streakode Feature Implementation Plan 🚀
 
-This document outlines new and additional features that are planned or already in development.
+This document outlines the planned enhancements for the history command, transforming it into a powerful tool for developers navigating their commit history.
+
+## Command Flow
+
+1. User enters `sk history` to start the interactive search
+2. User finds and selects a commit using fuzzy finder
+3. Upon selection, an action menu appears with the following categories:
+
+## Available Actions
+
+### 1. Code Investigation Actions 🔍
+- View full diff of the commit
+- View diff of specific files in that commit
+- Browse codebase at commit point (temporary branch checkout)
+- Compare with other commits
+- Show branch containment information
+- Interactive file browser for complex changes
+
+### 2. Code Recovery Actions 🔄
+- Cherry-pick commit to current branch
+- Revert commit
+- Create new branch from commit point
+- Export patch to file or clipboard
+- Interactive recovery wizard for complex operations
+
+### 3. Analysis Actions 📊
+- Detailed commit statistics
+- Related commits finder (same file modifications)
+- Commit relationship viewer (children/parents)
+- File blame information
+- Impact analysis (downstream effects)
+- Code churn visualization
+
+### 4. Communication Actions 📢
+- Copy commit hash to clipboard
+- Copy formatted commit message
+- Generate shareable links (GitHub/GitLab/Bitbucket)
+- Export commit details to various formats
+- Create commit summary report
+
+### 5. CI/CD Context Integration 🔄
+- Build status viewer
+- Test results display
+- Deployment status tracker
+- Environment distribution map
+- Pipeline visualization
+
+### 6. Issue Tracking Integration 🎯
+- Related issues/PRs viewer
+- Bug fix history for affected files
+- Impact analysis on known issues
+- Automated release notes generation
+- Issue statistics and trends
+
+## Implementation Phases
+
+### Phase 1: Core Actions 🚀
+1. Enhance commit selection UI with action menu
+2. Implement basic investigation actions:
+   - View full diff
+   - View file-specific diffs
+   - Browse code at commit point
+3. Add code recovery functionality:
+   - Cherry-pick
+   - Revert
+   - Branch creation
+4. Implement communication tools:
+   - Copy hash/message
+   - Generate shareable links
+
+### Phase 2: Analysis & Integration 🔗
+1. Implement analysis features:
+   - Commit statistics
+   - Related commits
+   - Impact analysis
+2. Add CI/CD integration:
+   - Build status
+   - Test results
+3. Add issue tracking:
+   - Related PRs
+   - Bug fixes
+
+### Phase 3: Advanced Features 🎯
+1. Enhanced visualization:
+   - Commit graphs
+   - Impact heat maps
+2. Smart features:
+   - AI-powered search
+   - Pattern detection
+3. Workflow automation:
+   - Custom actions
+   - Team integrations
+
+## Technical Considerations
+
+### Performance
+- Progressive loading for large histories
+- Cache frequently accessed data
+- Optimize diff generation
+- Background processing for heavy operations
+
+### User Experience
+- Fast and responsive UI
+- Clear action categories
+- Intuitive keyboard shortcuts
+- Consistent navigation patterns
+
+### Integration
+- Modular action system
+- Plugin architecture for new actions
+- External service integration
+- Secure credential handling
+
+## Future Enhancements
+
+### 1. Smart Features
+- AI-powered commit analysis
+- Natural language search
+- Code impact prediction
+- Pattern-based suggestions
+
+### 2. Advanced Visualization
+- Interactive commit graphs
+- Change impact visualization
+- Time-based activity views
+- Team contribution analysis
+
+### 3. Workflow Integration
+- Custom action definitions
+- Automated workflows
+- IDE integrations
+- Team collaboration tools
 
 ---
 
-## IDEAS
-- add optional "author" argument to the author command
-   -> i.e.: streakode author AccursedGalaxy -> to get detailed stats about this author (currently just shows author set from the config to verify it's setup correctly, but can easily expand this to show detailed stats abou the author as well)
-
-- new command set "history"
-   -> i.e.: streakode history -a AccursedGalaxy -> get detailed and nicely formatted information about the recent git activity from the selected author (-a flag) going beyond just commit message. (I love the idea with a nice and insightful overview this gonna be usefull)
-   -> i.e.: streakode hisotry -r streakode -> get detailed and nicely formatted information about the recent activity from a project not just form a single author. (Also really great idea and possibly super usefull)
-
-
-1. **Branch-Based Search**:
-```bash
-streakode history branch <branch-name>
-```
-- Search commits specific to a branch across repos
-- Show branch relationships and merge history
-- Compare branches visually
-
-2. **Content Search**:
-```bash
-streakode history search "query"
-```
-- Full-text search in commit diffs
-- Search for specific code changes
-- Find when a particular line was added/removed
-
-3. **Patch Management**:
-```bash
-streakode history patch
-```
-- Interactive selection of commits to create patches
-- Cherry-pick commits across repositories
-- Create patch series for code review
-
-4. **Time-Based Navigation**:
-```bash
-streakode history timeline
-```
-- Visual timeline of commits
-- Group by time periods (day/week/month)
-- Show parallel development streams
-
-5. **Related Commits**:
-```bash
-streakode history related <commit-hash>
-```
-- Find commits that modify the same files
-- Show commit dependencies
-- Track bug fixes and related changes
-
-6. **Tag/Release History**:
-```bash
-streakode history releases
-```
-- Show version tags and releases
-- Group commits by release
-- Show changelog-style history
-
-7. **Refactor History**:
-```bash
-streakode history refactor <file/directory>
-```
-- Track major refactoring changes
-- Show file movement history
-- Visualize code evolution
-
-
-## Next To Implement 🚀
-
-### Testing Implementation
-**Simulate Commit Data for Tests:**
-Develop a method to generate synthetic Git commit data for various testing scenarios.
-This will involve scripting the creation of mock repositories with diverse commit histories, authors, dates, and file changes.
-
-By simulating different patterns and edge cases, I can thoroughly test the CLI's functionality, performance, and robustness without relying on real repositories.
-
-**Detailed Implementation Plan:**
-See [sim_testing.md](docs/sim_testing.md) for the complete testing implementation plan and details.
-
-
-### 1. **Enhanced Historical Data Collection 📊**
-
-   Gain deeper insights by capturing more historical data and identifying coding trends and productivity patterns.
-
-   **Key Improvements:**
-   - Track commit velocity over time to observe productivity shifts.
-   - Provide productivity suggestions based on user-specific data trends, like identifying low-activity periods or highlighting peak productivity times.
-   - Introduce achievements for milestones and offer basic productivity tips for improvement.
-
----
-
-### 2. **Goal Tracking & Visualization 🎯**
-
-   Boost engagement with visual goal tracking, allowing users to set, track, and achieve coding milestones.
-
-   **Features:**
-   - Progress bars and indicators for weekly/monthly goals with visual feedback.
-   - Goal tracking with percentage completion to easily monitor progress.
-   - Goal completion history for motivation, tracking personal bests and progress over time.
-
-   **Implementation:**
-   - Integrate real-time visual indicators into `DisplayStats`.
-   - Display real-time completion percentages and progress toward goals within the command-line interface.
-
----
-
-### 3. **Badge System & Milestones 🏆**
-
-   Gamify the coding experience by introducing a badge and milestone system to celebrate user accomplishments.
-
-   **Features:**
-   - Award badges for reaching specific streaks, commit counts, and language milestones.
-   - Create a personal milestone history, encouraging users to break personal records.
-   - Adaptive difficulty that increases goal milestones based on past performance.
-
-   **Implementation:**
-   - Create a badge system with customizable icons and settings.
-   - Store milestone data to generate user-specific insights and set progressive goals.
-
----
-
-### 4. **Detailed Language and Commit Analytics 📈**
-
-   Gain insight into code contributions by language and commit detail, making it easy to see where time and effort are spent.
-
-   **Features:**
-   - Track language-specific contributions across repositories.
-   - Display changes in contribution trends by language over time.
-   - Provide a breakdown of commit activity to help users visualize contributions in each language.
-
-   **Implementation:**
-   - Display language and commit analytics in a dedicated stats section.
-   - Track trends and breakdowns using real-time and historical data from `CommitHistory`.
-
----
-
-### 5. **Team Collaboration Features 👥**
-
-   Enhance Streakode's functionality for team settings, allowing multiple developers to track and share their progress collaboratively.
-
-   **Features:**
-   - **Shared Reports**: Generate team reports that combine contributions across shared repositories.
-   - **Team Velocity Tracking**: Track and display each team member’s contributions and velocity on team projects.
-   - **Leaderboard**: Motivate team members with a leaderboard that highlights individual contributions.
-   - **Group Goals**: Enable teams to set and track shared commit goals for collaborative projects.
-
-   **Implementation:**
-   - Introduce `team` configuration with options for members and shared projects.
-   - Aggregate team member data in a shared file (e.g., JSON/CSV) to generate combined reports.
-   - Add privacy settings to let users control the visibility of their stats in team reports.
-
----
-
-### 6. **Interactive CLI & Configurable Display Options 💡**
-
-   Make Streakode more interactive and customizable to suit user preferences and workflows.
-
-   **Features:**
-   - Interactive mode for exploring stats and switching between detailed views.
-   - Configurable display options to adjust table styling, width, and output verbosity.
-   - Toggleable insights and data sections, allowing users to prioritize key metrics.
-
-   **Implementation:**
-   - Develop an `interactive` command to navigate stats via CLI.
-   - Add configuration options for table styles, width, and verbosity in the `.streakodeconfig` file.
-   - Enable real-time adjustments to output detail levels for flexible display preferences.
+This plan transforms the history command into a powerful tool for developers, making it easy to find and act on commits across repositories.
