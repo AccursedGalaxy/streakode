@@ -33,18 +33,26 @@ builds:
       - -X main.BuildTime={{.Date}}
 
 archives:
-  - format: tar.gz
+  - id: streakode
+    format: tar.gz
     name_template: >-
       {{ .ProjectName }}_
       {{- title .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
       {{- else }}{{ .Arch }}{{ end }}
+    files:
+      - none*  # Only include the binary
     format_overrides:
       - goos: windows
         format: zip
+    wrap_in_directory: false  # Don't create a directory in the archive
 
 checksum:
   name_template: 'checksums.txt'
+  algorithm: sha256
+
+signs:
+  - artifacts: checksum
 
 changelog:
   sort: asc
@@ -55,3 +63,20 @@ changelog:
       - '^ci:'
       - 'Merge pull request'
       - 'Merge branch'
+
+release:
+  github:
+    owner: AccursedGalaxy
+    name: streakode
+  draft: false
+  prerelease: auto
+  mode: replace
+  header: |
+    ## Streakode {{ .Version }} ({{ .Date }})
+    
+    For more information, see the [documentation](https://github.com/AccursedGalaxy/streakode#readme).
+  footer: |
+    ## Installation
+    ```bash
+    curl -sSL https://raw.githubusercontent.com/AccursedGalaxy/streakode/main/scripts/install.sh | bash
+    ```
