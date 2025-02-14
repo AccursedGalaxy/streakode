@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"runtime"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/AccursedGalaxy/streakode/config"
 	"github.com/AccursedGalaxy/streakode/scan"
 )
 
@@ -43,6 +45,9 @@ type CommitCache struct {
 
 	// Metadata
 	Repositories map[string]scan.RepoMetadata
+
+	// Track repo states for incremental updates
+	RepoStates map[string]RepoState
 }
 
 // AuthorStats holds aggregated statistics for an author
@@ -81,6 +86,14 @@ type RepoDisplayStats struct {
 	LastCommitTime time.Time
 }
 
+// RepoState tracks the state of a repository for incremental updates
+type RepoState struct {
+	LastHash     string    // Last known commit hash
+	LastScan     time.Time // Last scan timestamp
+	IsStale      bool      // Whether repo needs rescanning
+	ScanInterval time.Duration // Custom scan interval for this repo
+}
+
 // CacheManager handles all cache operations
 type CacheManager struct {
 	cache         *CommitCache
@@ -116,6 +129,7 @@ func newCommitCache() *CommitCache {
 		DateIndex:    make(map[string][]string),
 		AuthorIndex:  make(map[string][]string),
 		Repositories: make(map[string]scan.RepoMetadata),
+		RepoStates:   make(map[string]RepoState),
 	}
 }
 
@@ -143,7 +157,6 @@ func (cm *CacheManager) Refresh() error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
-	// Create worker pool for parallel processing
 	workerCount := runtime.NumCPU()
 	jobs := make(chan string, len(cm.cache.Repositories))
 	results := make(chan *scan.RepoMetadata, len(cm.cache.Repositories))
@@ -156,10 +169,12 @@ func (cm *CacheManager) Refresh() error {
 	// Queue jobs
 	for repoPath := range cm.cache.Repositories {
 		jobs <- repoPath
+		// Adjust scan interval for next time
+		cm.adjustScanInterval(repoPath)
 	}
 	close(jobs)
 
-	// Collect results and update cache
+	// Collect results
 	updatedRepos := make(map[string]scan.RepoMetadata)
 	for i := 0; i < len(cm.cache.Repositories); i++ {
 		if result := <-results; result != nil {
@@ -173,31 +188,89 @@ func (cm *CacheManager) Refresh() error {
 	return cm.Save()
 }
 
+// checkRepoState determines if a repo needs updating
+func (cm *CacheManager) checkRepoState(repoPath string) (bool, error) {
+	// Get current state
+	state := cm.cache.RepoStates[repoPath]
+	
+	// Check if minimum scan interval has elapsed
+	if time.Since(state.LastScan) < state.ScanInterval {
+		return false, nil
+	}
+
+	// Get latest commit hash
+	cmd := exec.Command("git", "-C", repoPath, "rev-parse", "HEAD")
+	output, err := cmd.Output()
+	if err != nil {
+		return false, fmt.Errorf("failed to get latest hash: %v", err)
+	}
+	
+	latestHash := strings.TrimSpace(string(output))
+	
+	// Repo needs update if hash changed
+	needsUpdate := latestHash != state.LastHash
+	
+	// Update state
+	state.LastHash = latestHash
+	state.LastScan = time.Now()
+	state.IsStale = needsUpdate
+	cm.cache.RepoStates[repoPath] = state
+	
+	return needsUpdate, nil
+}
+
+// adjustScanInterval updates the scan interval based on repo activity
+func (cm *CacheManager) adjustScanInterval(repoPath string) {
+	state := cm.cache.RepoStates[repoPath]
+	repo := cm.cache.Repositories[repoPath]
+	
+	// Base interval of 15 minutes
+	baseInterval := 15 * time.Minute
+	
+	// Adjust based on commit frequency
+	if repo.WeeklyCommits > 50 {
+		// Very active repo - check more frequently
+		state.ScanInterval = baseInterval
+	} else if repo.WeeklyCommits > 10 {
+		// Moderately active
+		state.ScanInterval = baseInterval * 2
+	} else {
+		// Less active
+		state.ScanInterval = baseInterval * 4
+	}
+	
+	// Don't scan dormant repos as frequently
+	if repo.Dormant {
+		state.ScanInterval *= 2
+	}
+	
+	cm.cache.RepoStates[repoPath] = state
+}
+
+// Update repoWorker to use incremental scanning
 func (cm *CacheManager) repoWorker(jobs <-chan string, results chan<- *scan.RepoMetadata) {
 	for repoPath := range jobs {
-		// Get existing metadata
-		existing := cm.cache.Repositories[repoPath]
+		// Check if repo needs update
+		needsUpdate, err := cm.checkRepoState(repoPath)
+		if err != nil {
+			if config.AppConfig.Debug {
+				fmt.Printf("Error checking repo state: %v\n", err)
+			}
+			results <- nil
+			continue
+		}
 
-		// Check if refresh is needed
-		if !cm.needsRefresh(repoPath) {
+		// Return existing metadata if no update needed
+		if !needsUpdate {
+			existing := cm.cache.Repositories[repoPath]
 			results <- &existing
 			continue
 		}
 
-		// Fetch fresh metadata
+		// Fetch fresh metadata if update needed
 		meta := scan.FetchRepoMetadata(repoPath)
 		results <- &meta
 	}
-}
-
-func (cm *CacheManager) needsRefresh(repoPath string) bool {
-	existing, exists := cm.cache.Repositories[repoPath]
-	if !exists {
-		return true
-	}
-
-	// Check if last analysis is too old
-	return time.Since(existing.LastAnalyzed) > 15*time.Minute
 }
 
 // updateCacheData updates the cache with new repository data and pre-calculates statistics
